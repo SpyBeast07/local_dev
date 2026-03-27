@@ -4,6 +4,9 @@ A powerful, unified developer workspace dashboard that aggregates your entire lo
 
 ## 💡 The Core Idea
 DevBeast brings together the functionality of Portainer, pgAdmin/Adminer, and system monitors into one sleek, glassmorphic UI. It provides immediate visibility and control over your stack:
+
+One of the main reasons to build this tool was that existing solutions like PgAdmin and Adminer can often feel slow and clunky; DevBeast is designed to be a high-performance, developer-first alternative.
+
 - 🐳 **Docker Containers**: Monitor active nodes, inspect running state, and view live formatting terminal logs.
 - 🗄️ **Postgres Schemas**: Connect dynamically to PostgreSQL to explore schemas, tables, and raw data.
 - 🧠 **Relations Graph**: Automatically format and visualize complex SQL Foreign Key relationships through an interactive, draggable network topology map.
