@@ -13,7 +13,17 @@
 
 	function triggerQuery() {
 		if (!query.trim()) return;
-		const isDangerous = query.toUpperCase().match(/INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER/);
+
+		// 1. Strip Single-line Comments (-- ...)
+		// 2. Strip Multi-line Comments (/* ... */)
+		const cleanQuery = query
+			.replace(/--.*$/gm, '')
+			.replace(/\/\*[\s\S]*?\*\//g, '');
+
+		// Identify destructive/mutating keywords with word boundaries
+		const destructiveKeywords = /\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|RENAME|GRANT|REVOKE)\b/i;
+		const isDangerous = cleanQuery.match(destructiveKeywords);
+
 		if (isDangerous) {
 			showConfirmModal = true;
 		} else {
@@ -134,6 +144,13 @@
 						{queryResult.error}
 					</div>
 				{:else if queryResult.columns && queryResult.data}
+					{#if queryResult.is_truncated}
+						<div class="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3">
+							<span class="text-lg">🛑</span>
+							<span>Result Set Truncated at 1,000 Rows for Performance Safety.</span>
+						</div>
+					{/if}
+					
 					<div class="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto custom-scrollbar shadow-inner">
 						<table class="w-full text-left border-collapse min-w-max">
 							<thead>

@@ -328,31 +328,45 @@ def get_relations():
         return {"error": str(e)}
 
 def execute_raw_query(query: str):
+    if not query.strip():
+        return {"success": False, "error": "Query cannot be empty."}
+        
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute(query)
-        
-        data = None
-        columns = None
-        affected_rows = cursor.rowcount
-        
-        if cursor.description:
-            columns = [desc[0] for desc in cursor.description]
-            rows = cursor.fetchall()
-            data = [dict(zip(columns, row)) for row in rows]
-            
-        conn.commit()
-        
-        cursor.close()
-        conn.close()
-        
-        return {
-            "success": True,
-            "columns": columns,
-            "data": data,
-            "affected_rows": affected_rows
-        }
+        # Use with context managers to ensure connection and cursor are always closed
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                # 1. Set a statement timeout for the session (10 seconds)
+                cursor.execute("SET statement_timeout = '10s';")
+                
+                # 2. Execute the user's query
+                cursor.execute(query)
+                
+                data = None
+                columns = None
+                affected_rows = cursor.rowcount
+                is_truncated = False
+                
+                if cursor.description:
+                    columns = [desc[0] for desc in cursor.description]
+                    
+                    # 3. Limit to 1000 rows to prevent memory exhaustion in frontend/backend
+                    rows = cursor.fetchmany(1001) # Fetch one extra to check for truncation
+                    
+                    if len(rows) > 1000:
+                        is_truncated = True
+                        rows = rows[:1000]
+                        
+                    data = [dict(zip(columns, row)) for row in rows]
+                
+                # Commit any data mutations
+                conn.commit()
+                
+                return {
+                    "success": True,
+                    "columns": columns,
+                    "data": data,
+                    "affected_rows": affected_rows,
+                    "is_truncated": is_truncated
+                }
     except Exception as e:
         return {"success": False, "error": str(e)}
