@@ -370,3 +370,19 @@ def execute_raw_query(query: str):
                 }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+def validate_db_config(config: dict):
+    try:
+        conn = psycopg2.connect(
+            host=config.get("db_host"),
+            port=config.get("db_port"),
+            user=config.get("db_user"),
+            password=config.get("db_password"),
+            dbname=config.get("db_name"),
+            connect_timeout=5
+        )
+        conn.close()
+        return True
+    except Exception as e:
+        raise Exception(f"Database connection failed: {str(e)}")

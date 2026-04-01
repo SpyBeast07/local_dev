@@ -77,16 +77,6 @@
 						<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 block">PostgreSQL Gateway Profile</p>
 					</div>
 				</div>
-
-				{#if notification.show}
-					<div 
-						class="px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 animate-in fade-in slide-in-from-right-4 
-						{notification.type === 'success' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'}"
-					>
-						<span class="w-2 h-2 rounded-full {notification.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse"></span>
-						{notification.message}
-					</div>
-				{/if}
 			</div>
 
 			<form class="space-y-6" onsubmit={(e) => { e.preventDefault(); saveConfig(); }}>
@@ -153,7 +143,18 @@
 					</div>
 				</div>
 
-				<div class="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
+				<div class="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-6">
+					{#if notification.show}
+						<div 
+							class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 animate-in fade-in slide-in-from-right-4 
+							{notification.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20 max-w-xs truncate'}"
+							title={notification.message}
+						>
+							<span class="w-1.5 h-1.5 rounded-full {notification.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}"></span>
+							{notification.type === 'success' ? 'Updated!' : 'Failed!'}
+						</div>
+					{/if}
+
 					<button 
 						type="submit" 
 						disabled={saving}

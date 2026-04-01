@@ -8,7 +8,7 @@ from services.docker import (
     get_images, pull_image, delete_image, get_volumes, get_networks, deploy_container
 )
 from services.ports import get_ports, kill_port_process
-from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row
+from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config
 
 load_dotenv()
 
@@ -130,9 +130,18 @@ def get_db_config():
 @app.post("/config/db")
 async def update_db_config(request: Request):
     data = await request.json()
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-    return {"message": "Config updated"}
+    try:
+        # Validate before saving
+        validate_db_config(data)
+        
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(data, f, indent=4)
+        return {"success": True, "message": "Config updated"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": str(e)}
+        )
 
 
 from fastapi.middleware.cors import CORSMiddleware
