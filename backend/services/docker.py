@@ -304,3 +304,101 @@ def get_dependency_graph():
             })
             
     return {"nodes": list(nodes_map.values()), "edges": edges}
+
+def get_impact_analysis(table_name: str):
+    """Compute the blast radius of a table failure."""
+    graph = get_dependency_graph()
+    nodes = graph["nodes"]
+    edges = graph["edges"]
+    
+    # 1. Build Adjacency Map for Downstream Impact (Inverted FKs)
+    # Incoming FKs: tables that REFERENCE this table are downstream dependents.
+    # Original edge: source -> target (FK source -> target table)
+    # Impact edge: target -> source
+    table_to_dependents = {}
+    for e in edges:
+        if e.get("type") == "foreign_key":
+            target = e["to"]
+            source = e["from"]
+            if target not in table_to_dependents:
+                table_to_dependents[target] = []
+            table_to_dependents[target].append(source)
+            
+    # 2. DFS for Downstream Tables
+    dependent_tables = []
+    visited = set()
+    stack = [table_name]
+    while stack:
+        current = stack.pop()
+        for neighbor in table_to_dependents.get(current, []):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                dependent_tables.append(neighbor)
+                stack.append(neighbor)
+                
+    # 3. Find Database for this table
+    db_node_id = None
+    for e in edges:
+        if e.get("type") == "contains" and e["to"] == table_name:
+            db_node_id = e["from"]
+            break
+            
+    # 4. Find Connected Containers
+    impacted_containers = []
+    if db_node_id:
+        for e in edges:
+            if e.get("type") == "connects_to" and e["to"] == db_node_id:
+                impacted_containers.append(e["from"])
+                
+    # 5. Find Exposed Ports (Services)
+    impacted_services = []
+    for c_id in impacted_containers:
+        for e in edges:
+            if e.get("type") == "exposes" and e["from"] == c_id:
+                impacted_services.append(e["to"])
+                
+    # Compile All Affected IDs for Frontend Highlighting
+    # Origin Table + Dependents + DB + Containers + Services
+    impact_ids = [table_name] + dependent_tables
+    if db_node_id: impact_ids.append(db_node_id)
+    impact_ids += impacted_containers
+    impact_ids += impacted_services
+    
+    # Human labels for summary
+    c_labels = []
+    for cid in impacted_containers:
+        node = next((n for n in nodes if n["id"] == cid), None)
+        if node: c_labels.append(node["label"])
+        
+    s_labels = []
+    for sid in impacted_services:
+        node = next((n for n in nodes if n["id"] == sid), None)
+        if node: s_labels.append(node["label"])
+
+    # 6. Calculate Severity Score
+    # score = (num_tables * 1) + (num_containers * 3) + (num_services * 2)
+    # Ensure uniqueness
+    unique_tables = len(list(set(dependent_tables)))
+    unique_containers = len(list(set(impacted_containers)))
+    unique_services = len(list(set(impacted_services)))
+    
+    score = (unique_tables * 1) + (unique_containers * 3) + (unique_services * 2)
+    
+    if score >= 10:
+        severity = "HIGH"
+    elif score >= 5:
+        severity = "MEDIUM"
+    else:
+        severity = "LOW"
+
+    return {
+        "table": table_name,
+        "dependent_tables": dependent_tables,
+        "database_id": db_node_id,
+        "containers": c_labels,
+        "services": s_labels,
+        "impact_ids": impact_ids,
+        "severity": severity,
+        "score": score,
+        "summary": f"If '{table_name.split('.')[-1].upper()}' fails, {len(dependent_tables)} table(s) and {len(impacted_containers)} container(s) are impacted ({severity} severity)."
+    }

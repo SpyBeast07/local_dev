@@ -8,6 +8,9 @@
 	let error = $state("");
 	let network: Network | null = null;
 	let selectedNode = $state<any>(null);
+	let impactData = $state<any>(null);
+	let nodesDataSet: any = null;
+	let edgesDataSet: any = null;
 
 	onMount(async () => {
 		try {
@@ -18,18 +21,22 @@
 			await tick();
 
 			if (container) {
-				const data = {
-					nodes: backendNodes.map((n: any) => ({
-						...n,
-						group: n.type,
-						title: n.label
-					})),
-					edges: backendEdges.map((e: any) => ({
-						...e,
-						arrows: "to",
-						label: e.label || ""
-					}))
-				};
+				const { DataSet } = await import("vis-network/standalone");
+				nodesDataSet = new DataSet(backendNodes.map((n: any) => ({
+					...n,
+					group: n.type,
+					title: n.label,
+					originalColor: null // Store for reset
+				})));
+				
+				edgesDataSet = new DataSet(backendEdges.map((e: any) => ({
+					...e,
+					arrows: "to",
+					label: e.label || "",
+					originalColor: null
+				})));
+
+				const data = { nodes: nodesDataSet, edges: edgesDataSet };
 
 				const options: any = {
 					groups: {
@@ -40,9 +47,7 @@
 								background: '#0c4a6e', // sky-900
 								highlight: '#38bdf8'
 							},
-							font: { color: '#f0f9ff', face: 'Outfit', size: 16, bold: true },
-							borderWidth: 2,
-							shadow: { enabled: true, color: 'rgba(14, 165, 233, 0.2)', size: 15 }
+							font: { color: '#f0f9ff', face: 'Outfit', size: 16, bold: true }
 						},
 						port: {
 							shape: 'dot',
@@ -52,8 +57,7 @@
 								background: '#78350f', // amber-900
 								highlight: '#fbbf24'
 							},
-							font: { color: '#fef3c7', face: 'Outfit', size: 12 },
-							borderWidth: 2
+							font: { color: '#fef3c7', face: 'Outfit', size: 12 }
 						},
 						database: {
 							shape: 'database',
@@ -62,9 +66,7 @@
 								background: '#064e3b', // emerald-900
 								highlight: '#34d399'
 							},
-							font: { color: '#ecfdf5', face: 'Outfit', size: 18, bold: true },
-							borderWidth: 3,
-							shadow: { enabled: true, color: 'rgba(16, 185, 129, 0.3)', size: 20 }
+							font: { color: '#ecfdf5', face: 'Outfit', size: 18, bold: true }
 						},
 						table: {
 							shape: 'box',
@@ -74,16 +76,16 @@
 								highlight: '#818cf8'
 							},
 							font: { color: '#eef2ff', face: 'Outfit', size: 14 },
-							borderWidth: 2,
 							shapeProperties: { borderRadius: 8 }
 						}
 					},
 					nodes: {
 						font: { face: 'Outfit', color: '#ffffff' },
-						margin: 10
+						margin: 10,
+						shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10 }
 					},
 					edges: {
-						color: { color: '#334155', highlight: '#6366f1' },
+						color: { color: '#334155', highlight: '#6366f1', opacity: 0.8 },
 						width: 2,
 						smooth: { type: 'continuous' },
 						font: { color: '#64748b', size: 10, strokeWidth: 0 }
@@ -100,24 +102,41 @@
 						maxVelocity: 50,
 						minVelocity: 0.1,
 						stabilization: { iterations: 150 }
-					},
-					interaction: {
-						hover: true,
-						tooltipDelay: 100,
-						zoomView: true,
-						dragView: true
 					}
 				};
 
 				network = new Network(container, data, options);
 				
-				network.on("selectNode", (params) => {
+				network.on("selectNode", async (params) => {
 					const nodeId = params.nodes[0];
-					selectedNode = backendNodes.find((n: any) => n.id === nodeId);
+					const node = nodesDataSet.get(nodeId);
+					selectedNode = node;
+					
+					if (node.type === 'table') {
+						try {
+							const impactRes = await axios.get(`http://127.0.0.1:8000/system/impact-analysis?table=${nodeId}`);
+							impactData = impactRes.data;
+							highlightImpact(impactData.impact_ids);
+						} catch (err) {
+							console.error("Impact analysis failed:", err);
+						}
+					} else {
+						resetHighlight();
+					}
 				});
 
 				network.on("deselectNode", () => {
 					selectedNode = null;
+					impactData = null;
+					resetHighlight();
+				});
+
+				network.on("click", (params) => {
+					if (params.nodes.length === 0) {
+						selectedNode = null;
+						impactData = null;
+						resetHighlight();
+					}
 				});
 			}
 		} catch (err: any) {
@@ -126,8 +145,62 @@
 		}
 	});
 
+	function highlightImpact(impactIds: string[]) {
+		if (!nodesDataSet || !edgesDataSet) return;
+		
+		const impactSet = new Set(impactIds);
+		
+		nodesDataSet.update(nodesDataSet.map((n: any) => {
+			const isImpacted = impactSet.has(n.id);
+			const isOrigin = n.id === impactData.table;
+			
+			let color = n.color;
+			if (isOrigin) {
+				color = { border: '#ef4444', background: '#7f1d1d', highlight: '#f87171' };
+			} else if (isImpacted && n.type === 'table') {
+				color = { border: '#f97316', background: '#7c2d12', highlight: '#fb923c' };
+			}
+
+			return {
+				id: n.id,
+				opacity: isImpacted ? 1 : 0.1,
+				color: isImpacted ? color : { opacity: 0.1 },
+				shadow: { enabled: isImpacted, size: isOrigin ? 30 : 15, color: isOrigin ? 'rgba(239, 68, 68, 0.5)' : 'rgba(0,0,0,0.5)' }
+			};
+		}));
+
+		edgesDataSet.update(edgesDataSet.map((e: any) => {
+			const isImpacted = impactSet.has(e.from) && impactSet.has(e.to);
+			return {
+				id: e.id,
+				color: isImpacted ? { color: '#f97316', highlight: '#f97316' } : { color: '#1e293b', opacity: 0.1 },
+				width: isImpacted ? 4 : 1
+			};
+		}));
+	}
+
+	function resetHighlight() {
+		if (!nodesDataSet || !edgesDataSet) return;
+		impactData = null;
+		
+		nodesDataSet.update(nodesDataSet.map((n: any) => ({
+			id: n.id,
+			opacity: 1,
+			color: null, // Reset to group default
+			shadow: { enabled: true, size: 10, color: 'rgba(0,0,0,0.5)' }
+		})));
+
+		edgesDataSet.update(edgesDataSet.map((e: any) => ({
+			id: e.id,
+			color: { color: '#334155', highlight: '#6366f1', opacity: 0.8 },
+			width: 2
+		})));
+	}
+
 	function closePanel() {
 		selectedNode = null;
+		impactData = null;
+		resetHighlight();
 		if (network) network.unselectAll();
 	}
 </script>
@@ -194,6 +267,7 @@
 				<button 
 					onclick={closePanel}
 					class="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+					aria-label="Close panel"
 				>
 					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
 				</button>
@@ -215,7 +289,41 @@
 
 				<div class="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
 					<div class="flex flex-col gap-6 pt-4">
-						{#if selectedNode.metadata}
+						{#if impactData}
+							<section class="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 {impactData.severity === 'HIGH' ? 'animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.2)]' : ''}">
+								<div class="flex items-center justify-between mb-2">
+									<h3 class="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em]">🚨 Impact Analysis</h3>
+									<span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border 
+										{impactData.severity === 'HIGH' ? 'bg-rose-500 text-white border-rose-600' : 
+										 impactData.severity === 'MEDIUM' ? 'bg-orange-500 text-white border-orange-600' : 
+										 'bg-emerald-500 text-white border-emerald-600'}">
+										{impactData.severity} IMPACT
+									</span>
+								</div>
+								<p class="text-xs font-bold text-rose-400 leading-relaxed mb-4">{impactData.summary}</p>
+								
+								<div class="space-y-4">
+									<div>
+										<div class="text-[9px] font-bold text-rose-500/60 uppercase mb-1">Affected Tables</div>
+										<div class="flex flex-wrap gap-1">
+											{#each impactData.dependent_tables as table}
+												<span class="text-[9px] px-2 py-1 bg-rose-500/20 text-rose-300 rounded-md font-bold uppercase">{table.split('.').pop()}</span>
+											{/each}
+										</div>
+									</div>
+									<div>
+										<div class="text-[9px] font-bold text-rose-500/60 uppercase mb-1">Impacted Containers</div>
+										<div class="flex flex-wrap gap-1">
+											{#each impactData.containers as container}
+												<span class="text-[9px] px-2 py-1 bg-sky-500/20 text-sky-300 rounded-md font-bold uppercase">{container}</span>
+											{/each}
+										</div>
+									</div>
+								</div>
+							</section>
+						{/if}
+
+						{#if selectedNode.metadata && !impactData}
 							{#if selectedNode.type === 'container'}
 								<section>
 									<h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Service Details</h3>
@@ -234,7 +342,7 @@
 								<section>
 									<h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Environment</h3>
 									<div class="flex flex-col gap-2">
-										{#each selectedNode.metadata.env as env}
+										{#each (selectedNode.metadata.env || []) as env}
 											<div class="text-[10px] font-mono p-2 bg-slate-950 text-emerald-400 rounded-lg border border-slate-800 break-all">
 												{env}
 											</div>
@@ -275,7 +383,7 @@
 									</div>
 								</section>
 							{/if}
-						{:else}
+						{:else if !impactData}
 							<div class="text-center py-20 text-slate-200 dark:text-slate-800">
 								<svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 								<p class="text-[10px] font-black uppercase tracking-widest">No Deep Metadata Available</p>
