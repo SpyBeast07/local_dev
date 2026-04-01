@@ -36,14 +36,7 @@ def export_db(export_format: str = "sql"):
         except subprocess.CalledProcessError as e:
             return {"success": False, "error": f"pg_dump failed: {str(e)}"}
 
-    elif export_format == "dbml":
-        try:
-            dbml_content = generate_dbml(dbname)
-            return {"success": True, "data": dbml_content, "filename": f"{dbname}_schema.dbml", "mime": "text/plain"}
-        except Exception as e:
-            return {"success": False, "error": f"DBML generation failed: {str(e)}"}
-
-    # For data-heavy formats (JSON, CSV, Excel), use pandas to fetch rows
+    # For data-heavy formats (JSON, DBML, CSV, Excel), fetch row data first
     try:
         all_tables = get_tables()
         if isinstance(all_tables, dict) and "error" in all_tables:
@@ -71,7 +64,12 @@ def export_db(export_format: str = "sql"):
                                 
                     tables_data[t_ref] = df
 
-        if export_format == "json":
+        if export_format == "dbml":
+            # Generate Hybrid DBML (Schema + Data)
+            dbml_data = generate_dbml(dbname, tables_data)
+            return {"success": True, "data": dbml_data, "filename": f"{dbname}_portable.dbml", "mime": "text/plain"}
+
+        elif export_format == "json":
             # Map tables to dict for JSON serialization
             data_dict = {t: df.to_dict(orient="records") for t, df in tables_data.items()}
             return {"success": True, "data": json.dumps(data_dict, indent=2, default=str), "filename": f"{dbname}_data.json", "mime": "application/json"}
@@ -102,9 +100,8 @@ def export_db(export_format: str = "sql"):
     return {"success": False, "error": f"Unsupported format: {export_format}"}
 
 
-
-def generate_dbml(dbname: str):
-    """Generates a DBML string representing the current schema."""
+def generate_dbml(dbname: str, tables_data: dict = None):
+    """Generates a DBML string representing the current schema, optionally bundling data."""
     tables = get_tables()
     lines = [f"// DevBeast DBML Export: {dbname}", ""]
     
@@ -151,6 +148,86 @@ def generate_dbml(dbname: str):
         lines.append(f'Ref: "{rel["source_table"]}"."{rel["source_column"]}" > "{rel["target_table"]}"."{rel["target_column"]}"')
 
 
+    # Bundle Data if requested (Hybrid DBML)
+    if tables_data:
+        lines.append("")
+        lines.append("/* DEVBEAST_DATA_START")
+
+        # --- Topological sort so parent tables are inserted before child tables ---
+        from .db import get_relations
+        fk_relations = get_relations()
+        # Build a {child_table: set(parent_tables)} map using bare table names
+        deps = {t_ref: set() for t_ref in tables_data}
+        for rel in fk_relations:
+            child  = rel.get("source_table")  # the table that HAS the FK column
+            parent = rel.get("target_table")  # the table being referenced
+            # Find matching t_refs (they may be "schema.table" or just "table")
+            child_ref  = next((r for r in tables_data if r.split(".")[-1] == child),  None)
+            parent_ref = next((r for r in tables_data if r.split(".")[-1] == parent), None)
+            if child_ref and parent_ref and child_ref != parent_ref:
+                deps.setdefault(child_ref, set()).add(parent_ref)
+
+        # Kahn's algorithm for topological ordering
+        from collections import deque
+        in_degree = {t: len(d) for t, d in deps.items()}
+        queue = deque(t for t, d in in_degree.items() if d == 0)
+        sorted_refs = []
+        while queue:
+            node = queue.popleft()
+            sorted_refs.append(node)
+            for t, d in deps.items():
+                if node in d:
+                    d.discard(node)
+                    in_degree[t] -= 1
+                    if in_degree[t] == 0:
+                        queue.append(t)
+        # Append any leftover (e.g. circular refs) at the end
+        for t in tables_data:
+            if t not in sorted_refs:
+                sorted_refs.append(t)
+        # --- End topological sort ---
+
+        for t_ref in sorted_refs:
+            df = tables_data.get(t_ref)
+            if df is None or df.empty: continue
+            schema, table = _parse_table_ref(t_ref)
+            
+            # Generate SQL Inserts
+            for _, row in df.iterrows():
+                cols = ", ".join([f'"{c}"' for c in df.columns])
+                vals = []
+                for v in row:
+                    # Check dict/list FIRST — pd.isna() raises ValueError on dicts
+                    if isinstance(v, bool):
+                        vals.append("TRUE" if v else "FALSE")
+                    elif isinstance(v, (dict, list)):
+                        # JSON/JSONB columns: use json.dumps for valid double-quoted JSON
+                        json_str = json.dumps(v, default=str).replace("'", "''")
+                        vals.append(f"'{json_str}'")
+                    elif isinstance(v, (int, float)):
+                        try:
+                            if pd.isna(v):
+                                vals.append("NULL")
+                            else:
+                                vals.append(str(v))
+                        except (ValueError, TypeError):
+                            vals.append(str(v))
+                    else:
+                        # str, datetime, uuid, Decimal, etc.
+                        try:
+                            is_null = pd.isna(v)
+                        except (ValueError, TypeError):
+                            is_null = v is None
+                        
+                        if is_null:
+                            vals.append("NULL")
+                        else:
+                            escaped = str(v).replace("'", "''")
+                            vals.append(f"'{escaped}'")
+                
+                lines.append(f'INSERT INTO "{schema}"."{table}" ({cols}) VALUES ({", ".join(vals)});')
+        lines.append("DEVBEAST_DATA_END */")
+
     return "\n".join(lines)
 
 def restore_db(content, filename: str, clean_schema: bool = False):
@@ -161,16 +238,27 @@ def restore_db(content, filename: str, clean_schema: bool = False):
     if is_dbml:
         try:
             # Handle both string and bytes content
-            text_content = content.decode('utf-8') if isinstance(content, bytes) else content
-            p = PyDBML(text_content)
+            full_content = content.decode('utf-8') if isinstance(content, bytes) else content
+            
+            # Extract Hybrid Data block if present
+            dml_sql = ""
+            if "/* DEVBEAST_DATA_START" in full_content:
+                parts = full_content.split("/* DEVBEAST_DATA_START")
+                dbml_part = parts[0]
+                dml_part = parts[1].split("DEVBEAST_DATA_END */")[0]
+                dml_sql = dml_part.strip()
+            else:
+                dbml_part = full_content
+
+            p = PyDBML(dbml_part)
             # PostgreSQL does not support 'AUTOINCREMENT'. 
             # We translate it to the standard identity clause: 'GENERATED BY DEFAULT AS IDENTITY'
-            sql_to_run = p.sql.replace("AUTOINCREMENT", "GENERATED BY DEFAULT AS IDENTITY")
-            # DBML often contains UUID defaults that require extensions not explicitly defined in DBML.
-            sql_to_run = 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\n' + sql_to_run
+            ddl_sql = p.sql.replace("AUTOINCREMENT", "GENERATED BY DEFAULT AS IDENTITY")
+            
+            # Combine Schema (DDL) and Data (DML)
+            sql_to_run = f'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\n{ddl_sql}\n{dml_sql}'
         except Exception as e:
             return {"success": False, "error": f"DBML Parsing failed: {str(e)}"}
-
 
     else:
         sql_to_run = content.decode('utf-8') if isinstance(content, bytes) else content
