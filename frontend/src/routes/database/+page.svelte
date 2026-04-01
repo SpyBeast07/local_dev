@@ -714,7 +714,6 @@
 			aria-modal="true"
 			aria-label="Root Mutation Verification"
 			tabindex="-1"
-			onclick={(e) => e.stopPropagation()}
 		>
 			<div
 				class="w-16 h-16 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center text-3xl mx-auto animate-pulse"
@@ -741,7 +740,6 @@
 					placeholder={dbName}
 					onpaste={(e) => e.preventDefault()}
 					oncopy={(e) => e.preventDefault()}
-					onclick={(e) => e.stopPropagation()}
 					class="w-full px-4 py-3 rounded-xl bg-black/20 border-2 {typedConfirmation === dbName ? 'border-emerald-500/50' : 'border-rose-500/30'} text-white text-center font-bold uppercase tracking-widest text-sm focus:outline-none focus:border-rose-500/60 transition-all placeholder:opacity-20"
 				/>
 				{#if typedConfirmation && typedConfirmation !== dbName}
