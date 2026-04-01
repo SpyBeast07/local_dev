@@ -280,7 +280,7 @@
 	{:else}
 		<!-- STRUCTURE TAB -->
 		{#if activeTab === 'structure'}
-			<div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300">
+			<div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 w-full max-w-full">
 				<div class="px-8 py-6 bg-slate-50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
 					<span class="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest italic leading-none">{structure.length} Columns Detected</span>
 				</div>
@@ -323,7 +323,7 @@
 
 		<!-- DATA TAB -->
 		{#if activeTab === 'data'}
-			<div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 relative">
+			<div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 relative w-full max-w-full">
 				
 				<!-- Header Actions & Paginator top -->
 				<div class="px-6 py-4 bg-slate-50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -343,8 +343,8 @@
 					</div>
 				</div>
 
-				<div class="overflow-x-auto">
-					<table class="w-full text-left border-collapse whitespace-nowrap">
+				<div class="overflow-x-auto custom-scrollbar">
+					<table class="min-w-full text-left border-collapse whitespace-nowrap">
 						<thead>
 							<tr class="bg-slate-50/50 dark:bg-slate-950/30">
 								<th class="px-6 py-4 w-1 border-b border-slate-100 dark:border-slate-800 sticky left-0 z-20 bg-slate-50 dark:bg-slate-950"></th>
@@ -382,9 +382,32 @@
 									
 									<!-- Data Cells -->
 									{#each structure as col}
-										<td class="px-6 py-3 text-sm font-bold {col.is_primary ? 'text-purple-600 dark:text-purple-400' : 'text-slate-600 dark:text-slate-300'} italic max-w-sm truncate">
+										<td class="px-6 py-3 text-sm {col.is_primary ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-slate-600 dark:text-slate-300'} max-w-sm truncate">
 											{#if row[col.name] === null}
-												<span class="text-slate-400 dark:text-slate-600 not-italic font-mono text-xs">NULL</span>
+												<span class="text-slate-400 dark:text-slate-600 italic font-mono text-[10px] uppercase tracking-widest opacity-50">NULL</span>
+											
+											{:else if col.type.toLowerCase().includes('bool')}
+												{#if row[col.name] === true || String(row[col.name]).toLowerCase() === 'true'}
+													<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">TRUE</span>
+												{:else}
+													<span class="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-500 text-[10px] font-black uppercase tracking-widest border border-rose-500/20">FALSE</span>
+												{/if}
+
+											{:else if col.type.toLowerCase().includes('timestamp') || col.type.toLowerCase().includes('date')}
+												<span class="text-cyan-600 dark:text-cyan-400 font-mono text-[11px] font-bold" title={String(row[col.name])}>
+													{new Date(row[col.name]).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })}
+												</span>
+
+											{:else if col.type.toLowerCase().includes('uuid')}
+												<span class="text-purple-500 dark:text-purple-400 font-mono text-[11px] font-bold tracking-tight lowercase">
+													{String(row[col.name])}
+												</span>
+
+											{:else if col.type.toLowerCase().includes('bytea')}
+												<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-[9px] font-black uppercase tracking-widest border border-slate-200 dark:border-slate-700 italic">
+													&lt;binary&gt;
+												</span>
+
 											{:else if isJsonValue(row[col.name])}
 												<button
 													onclick={(e) => { e.preventDefault(); e.stopPropagation(); openJsonViewer(col.name, row[col.name]); }}
@@ -393,8 +416,12 @@
 													<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
 													JSON
 												</button>
+
+											{:else if col.type.toLowerCase().includes('int') || col.type.toLowerCase().includes('numeric') || col.type.toLowerCase().includes('serial') || col.type.toLowerCase().includes('double')}
+												<span class="text-blue-500 dark:text-blue-400 font-mono font-bold">{row[col.name]}</span>
+
 											{:else}
-												<span title={String(row[col.name])}>{String(row[col.name])}</span>
+												<span class="italic font-bold" title={String(row[col.name])}>{String(row[col.name])}</span>
 											{/if}
 										</td>
 									{/each}
@@ -475,8 +502,21 @@
 
 <!-- JSON VIEWER MODAL -->
 {#if jsonViewerOpen}
-<div class="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/70 backdrop-blur-sm" onclick={() => jsonViewerOpen = false} role="dialog" aria-modal="true">
-	<div class="bg-slate-950 border border-slate-700 shadow-2xl rounded-[2rem] w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-200" onclick={(e) => e.stopPropagation()}>
+<div 
+	class="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/70 backdrop-blur-sm" 
+	onclick={() => jsonViewerOpen = false} 
+	onkeydown={(e) => e.key === 'Escape' && (jsonViewerOpen = false)}
+	tabindex="-1"
+	role="dialog" 
+	aria-modal="true"
+>
+	<div 
+		class="bg-slate-950 border border-slate-700 shadow-2xl rounded-[2rem] w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-200" 
+		onclick={(e) => e.stopPropagation()} 
+		onkeydown={(e) => e.stopPropagation()}
+		role="presentation"
+		tabindex="-1"
+	>
 		<!-- Header -->
 		<div class="flex items-center justify-between px-6 py-4 border-b border-slate-800 shrink-0">
 			<div class="flex items-center gap-3">

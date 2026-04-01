@@ -163,7 +163,13 @@ def get_table_data(table_name: str, limit: int = 20, offset: int = 0, sort_col: 
         rows = cursor.fetchall()
         columns = [desc[0] for desc in cursor.description]
         
-        data = [dict(zip(columns, row)) for row in rows]
+        # Apply serialization sanitization to each row
+        data = []
+        for row in rows:
+            mapped_row = dict(zip(columns, row))
+            # Convert non-serializable PG types to JSON-safe formats
+            sanitized_row = {k: _make_serializable(v) for k, v in mapped_row.items()}
+            data.append(sanitized_row)
 
         cursor.close()
         conn.close()
@@ -356,7 +362,12 @@ def execute_raw_query(query: str):
                         is_truncated = True
                         rows = rows[:1000]
                         
-                    data = [dict(zip(columns, row)) for row in rows]
+                    # Apply serialization sanitization to each row
+                    data = []
+                    for row in rows:
+                        mapped_row = dict(zip(columns, row))
+                        sanitized_row = {k: _make_serializable(v) for k, v in mapped_row.items()}
+                        data.append(sanitized_row)
                 
                 # Commit any data mutations
                 conn.commit()
@@ -386,3 +397,24 @@ def validate_db_config(config: dict):
         return True
     except Exception as e:
         raise Exception(f"Database connection failed: {str(e)}")
+
+def _make_serializable(val):
+    """
+    Converts PostgreSQL specific types (Decimal, UUID, DateTime, Bytes)
+    into JSON-serializable formats for the API.
+    """
+    import decimal
+    import datetime
+    import uuid
+
+    if val is None:
+        return None
+    if isinstance(val, (datetime.datetime, datetime.date, datetime.time)):
+        return val.isoformat()
+    if isinstance(val, decimal.Decimal):
+        return float(val)
+    if isinstance(val, uuid.UUID):
+        return str(val)
+    if isinstance(val, (bytes, memoryview)):
+        return "<binary data>"
+    return val

@@ -81,7 +81,7 @@
 	</header>
 
 	<!-- SQL RUNNER SECTION -->
-	<div class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-6 relative overflow-hidden">
+	<div class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-6 relative overflow-hidden w-full max-w-full">
 		<div class="flex items-center justify-between">
 			<h2 class="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest italic flex items-center gap-2"><span class="text-emerald-500">ROOT</span> Raw SQL Editor</h2>
 			{#if queryLoading}

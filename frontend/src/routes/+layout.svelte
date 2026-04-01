@@ -27,8 +27,8 @@
 	});
 </script>
 
-<div class={["flex h-screen overflow-hidden font-sans transition-colors duration-500", isDark ? "dark" : ""].join(" ")}>
-	<div class="flex flex-1 bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
+<div class={["flex h-screen w-screen overflow-hidden font-sans transition-colors duration-500", isDark ? "dark" : ""].join(" ")}>
+	<div class="flex flex-1 w-full max-w-full overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
 		<!-- Sidebar -->
 		<aside class="w-72 bg-slate-950 text-slate-300 p-8 flex flex-col gap-10 shrink-0 shadow-2xl z-10 border-r border-slate-900">
 			<div class="flex items-center gap-4 group cursor-default">
@@ -140,11 +140,11 @@
 		</aside>
 
 		<!-- Main Content -->
-		<main class="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 relative transition-colors duration-500">
+		<main class="flex-1 min-w-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 relative transition-colors duration-500">
 			<!-- Subtle background gradient -->
 			<div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100/20 dark:from-indigo-900/10 via-transparent to-transparent pointer-events-none"></div>
 			
-			<div class="p-10 max-w-7xl mx-auto relative z-0 text-slate-900 dark:text-slate-100">
+			<div class="p-10 w-full max-w-7xl mx-auto relative z-0 text-slate-900 dark:text-slate-100">
 				{@render children()}
 			</div>
 		</main>
