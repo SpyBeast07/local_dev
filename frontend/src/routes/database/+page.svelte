@@ -17,6 +17,8 @@
 	let showRestoreModal = $state(false);
 	let restoreFile = $state<File | null>(null);
 	let restoreClean = $state(false);
+	let showExportDropdown = $state(false);
+
 
 	function triggerQuery() {
 		if (!query.trim()) return;
@@ -44,48 +46,76 @@
 		executeSQL();
 	}
 
-	async function handleBackup() {
+	async function handleBackup(format: string = 'sql') {
 		backupLoading = true;
+		showExportDropdown = false;
 		try {
-			const res = await axios.get('http://127.0.0.1:8000/db/backup', { responseType: 'blob' });
-			const defaultName = `backup_${new Date().toISOString().split('T')[0]}.sql`;
+			const res = await axios.get(`http://127.0.0.1:8000/db/backup?format=${format}`, {
+				responseType: 'blob'
+			});
+
+			const extensions: any = {
+				sql: '.sql',
+				json: '.json',
+				dbml: '.dbml',
+				csv: '.zip',
+				excel: '.xlsx'
+			};
+			const mimeTypes: any = {
+				sql: 'application/sql',
+				json: 'application/json',
+				dbml: 'text/plain',
+				csv: 'application/zip',
+				excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+			};
+
+			const ext = extensions[format] || '.sql';
+			const mime = mimeTypes[format] || 'application/sql';
+			const defaultName = `backup_${new Date().toISOString().split('T')[0]}${ext}`;
 			let finalName = defaultName;
+
+			// Try to extract filename from Content-Disposition header if available
+			const contentDisp = res.headers['content-disposition'];
+			if (contentDisp && contentDisp.includes('filename=')) {
+				finalName = contentDisp.split('filename=')[1].split(';')[0];
+			}
+
+			const blobContent = res.data;
 
 			// Use File System Access API if available for "Save As" experience
 			if ('showSaveFilePicker' in window) {
 				try {
 					const handle = await (window as any).showSaveFilePicker({
-						suggestedName: defaultName,
+						suggestedName: finalName,
 						types: [
 							{
-								description: 'SQL Backup File',
-								accept: { 'application/sql': ['.sql'] }
+								description: `${format.toUpperCase()} Export File`,
+								accept: { [mime]: [ext] }
 							}
 						]
 					});
 					finalName = handle.name;
 					const writable = await handle.createWritable();
-					await writable.write(res.data);
+					await writable.write(blobContent);
 					await writable.close();
 				} catch (err: any) {
 					if (err.name === 'AbortError') return;
 					console.warn('Picker failed or cancelled, using fallback', err);
 
-					// If picker cancelled/failed, we still do the fallback download below
-					const url = window.URL.createObjectURL(new Blob([res.data]));
+					const url = window.URL.createObjectURL(blobContent);
 					const link = document.createElement('a');
 					link.href = url;
-					link.setAttribute('download', defaultName);
+					link.setAttribute('download', finalName);
 					document.body.appendChild(link);
 					link.click();
 					document.body.removeChild(link);
 				}
 			} else {
 				// Standard fallback download
-				const url = window.URL.createObjectURL(new Blob([res.data]));
+				const url = window.URL.createObjectURL(blobContent);
 				const link = document.createElement('a');
 				link.href = url;
-				link.setAttribute('download', defaultName);
+				link.setAttribute('download', finalName);
 				document.body.appendChild(link);
 				link.click();
 				document.body.removeChild(link);
@@ -94,14 +124,17 @@
 			// Show success in Execution Results
 			queryResult = {
 				success: true,
-				affected_rows: `Snapshot '${finalName}' Exported Successfully`
+				affected_rows: `SNAPSHOT '${finalName.toUpperCase()}' EXPORTED SUCCESSFULLY`
 			};
-		} catch (err) {
-			console.error('Backup failed', err);
+		} catch (err: any) {
+			console.error('Backup failed:', err);
 		} finally {
 			backupLoading = false;
 		}
 	}
+
+
+
 
 	async function handleRestore() {
 		if (!restoreFile) return;
@@ -164,7 +197,22 @@
 			loading = false;
 		}
 	});
+
+	function clickOutside(node: any, callback: () => void) {
+		const handleClick = (e: MouseEvent) => {
+			if (node && !node.contains(e.target as Node) && !e.defaultPrevented) {
+				callback();
+			}
+		};
+		document.addEventListener('click', handleClick, true);
+		return {
+			destroy() {
+				document.removeEventListener('click', handleClick, true);
+			}
+		};
+	}
 </script>
+
 
 <div class="flex flex-col gap-10 pb-20">
 	<header class="flex flex-col gap-3">
@@ -196,8 +244,9 @@
 
 	<!-- SQL RUNNER SECTION -->
 	<div
-		class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-6 relative overflow-hidden w-full max-w-full"
+		class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-6 relative w-full max-w-full"
 	>
+
 		<div class="flex items-center justify-between">
 			<h2
 				class="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest italic flex items-center gap-2"
@@ -261,27 +310,44 @@
 						>
 							⚡ Database Portability
 						</p>
-						<div class="flex gap-2">
-							<button
-								onclick={handleBackup}
-								disabled={backupLoading}
-								class="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
-							>
-								Export .sql
-							</button>
+						<div class="flex gap-2 items-center">
+							<div class="relative">
+								<button
+									onclick={() => (showExportDropdown = !showExportDropdown)}
+									disabled={backupLoading}
+									class="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5"
+								>
+									Export ▾
+								</button>
+								{#if showExportDropdown}
+									<div
+										class="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-1.5 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+										use:clickOutside={() => (showExportDropdown = false)}
+									>
+
+										<button onclick={() => handleBackup('sql')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">SQL</button>
+										<button onclick={() => handleBackup('json')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">JSON</button>
+										<button onclick={() => handleBackup('dbml')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">DBML</button>
+										<button onclick={() => handleBackup('csv')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">CSV (Zip)</button>
+										<button onclick={() => handleBackup('excel')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">Excel</button>
+									</div>
+								{/if}
+							</div>
+
 							<label
 								class="bg-blue-500/10 hover:bg-blue-500 text-blue-600 dark:text-blue-400 hover:text-white px-3 py-1.5 rounded-lg border border-blue-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer"
 							>
 								Restore Payload
 								<input
 									type="file"
-									accept=".sql"
+									accept=".sql,.dbml"
 									class="hidden"
 									onchange={(e) => {
 										restoreFile = e.currentTarget.files?.[0] || null;
 										if (restoreFile) showRestoreModal = true;
 									}}
 								/>
+
 							</label>
 						</div>
 					</div>
@@ -675,10 +741,14 @@
 				>
 					Restore Payload
 				</h3>
-				<p class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] leading-relaxed">
-					Ready to inject <span class="text-blue-500 italic">{restoreFile?.name}</span> into the active
-					container.
-				</p>
+				<div class="flex flex-col gap-1 items-center">
+					<p class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] leading-relaxed">
+						Ready to inject <span class="text-blue-500 italic">{restoreFile?.name}</span>
+					</p>
+					<span class="px-2 py-0.5 bg-blue-500 text-white rounded text-[9px] font-black uppercase tracking-[0.2em]">
+						Detected: {restoreFile?.name.split('.').pop()?.toUpperCase() || 'SQL'}
+					</span>
+				</div>
 			</div>
 
 			<div

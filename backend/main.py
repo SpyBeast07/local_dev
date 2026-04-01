@@ -12,7 +12,7 @@ from services.docker import (
 )
 from services.ports import get_ports, kill_port_process
 from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config
-from services.backups import backup_db, restore_db
+from services.backups import export_db, restore_db
 
 load_dotenv()
 
@@ -155,26 +155,28 @@ def run_query(payload: QueryPayload):
     return execute_raw_query(payload.query)
 
 @app.get("/db/backup")
-def get_db_backup():
-    result = backup_db()
+def get_db_backup(format: str = "sql"):
+    result = export_db(format)
     if not result["success"]:
         return JSONResponse(status_code=500, content=result)
     
-    # Simple streaming of the SQL content
+    data = result["data"]
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+        
     return StreamingResponse(
-        io.BytesIO(result["sql"].encode()),
-        media_type="application/sql",
+        io.BytesIO(data),
+        media_type=result["mime"],
         headers={"Content-Disposition": f"attachment; filename={result['filename']}"}
     )
+
 
 @app.post("/db/restore")
 async def post_db_restore(file: UploadFile = File(...), clean: bool = Query(False)):
     content = await file.read()
-    try:
-        sql_text = content.decode("utf-8")
-        return restore_db(sql_text, clean_schema=clean)
-    except Exception as e:
-        return {"success": False, "error": f"Failed to decode file: {str(e)}"}
+    # Let the service handle format detection via filename
+    return restore_db(content, file.filename, clean_schema=clean)
+
 
 
 
