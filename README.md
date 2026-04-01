@@ -1,25 +1,48 @@
 # DevBeast 🚀 
 
-A powerful, unified developer workspace dashboard that aggregates your entire local development environment into a single, beautiful interface. 
+**DevBeast is a local-first DevOps control plane that gives developers real-time visibility and control over their entire development stack — containers, databases, and services — without context switching.**
 
-## 💡 The Core Idea
-DevBeast brings together the functionality of Portainer, pgAdmin/Adminer, and system monitors into one sleek, glassmorphic UI. It provides immediate visibility and control over your stack:
+## 😩 The Problem
+Modern development requires juggling multiple tools:
+- Docker containers in Portainer
+- Databases in pgAdmin
+- Logs in terminal
+- Ports and services manually tracked
 
-One of the main reasons to build this tool was that existing solutions like PgAdmin and Adminer can often feel slow and clunky; DevBeast is designed to be a high-performance, developer-first alternative.
+This leads to constant **context switching**, **slow debugging**, and **fragmented visibility** across your stack.
 
-- 🐳 **Docker Containers**: Monitor active nodes, inspect running state, and view live formatting terminal logs.
-- 🗄️ **Postgres Schemas**: Connect dynamically to PostgreSQL to explore schemas, tables, and raw data.
-- 🧠 **Relations Graph**: Automatically format and visualize complex SQL Foreign Key relationships through an interactive, draggable network topology map.
-- 🌐 **Running Services**: Instant system overview of all active network gateways and open ports running on your machine.
+## ⚡ Why DevBeast?
+DevBeast eliminates tool fragmentation by acting as a **local DevOps control plane**.
+- ⚡ **Faster debugging** with unified logs and services in one view.
+- 🧠 **Visual understanding** of complex database relationships.
+- 🚀 **Real-time visibility** without ever switching tools.
 
-Everything operates together in real-time under a responsive, dark-mode native dashboard.
+## 💡 The Control Plane Objective
+DevBeast isn't just a dashboard; it's a centralized command center that eliminates the clunky, slow experience of legacy tools. 
 
-## ✨ Key Features
-- **Centralized Dashboard**: High-level telemetry of your containers, database schemas, and open ports in one glance.
-- **Dynamic Connection Configs**: No need to restart the server or modify `.env` files manually. Update your database connection string visually from the **Settings** panel via the frontend.
-- **Interactive Schema Visualizer**: High-fidelity architectural graphs capable of auto-sorting complex table relationships into topological trees.
-- **Fault-Tolerant Rendering**: Defensive frontend architecture handles Docker daemon or Postgres connection drops gracefully with stylized "Isolated/Void" empty-state UI instead of crashing.
-- **Premium Aesthetics**: Fluid animations, glassmorphism overlays, custom scrollbars, and satisfying micro-interactions built with Svelte 5 and Tailwind CSS v4.
+One of the primary drivers for building DevBeast was the frustration with **PgAdmin** and **Adminer**—which often feel sluggish and outdated. DevBeast is engineered for high-performance, real-time interaction:
+
+- 🐳 **Docker Engine**: Direct control over containers, images, and volumes with live-streaming logs and telemetry.
+- 🗄️ **Postgres Explorer**: High-speed schema exploration and data manipulation, designed to be significantly faster than traditional web-based DB managers.
+- 🧠 **Relations Graph**: Instant visualization of complex SQL Foreign Key relationships through an interactive, topological map.
+- 🌐 **Network Gates**: Real-time monitoring and surgical termination of active local ports and services.
+
+## 🧩 Advanced Features
+- 🔥 **Port Killer**  
+  Instantly free blocked ports without leaving the dashboard.
+- 🛡️ **SQL Guardrails**  
+  Prevent unsafe queries and enforce safe execution patterns (timeouts & row caps).
+- ⚙️ **Smart Connection Validation**  
+  Settings only confirm when database connectivity is verified.
+- 🧬 **Typed Data Rendering**  
+  Automatically formats fields (JSON, date, UUID, etc.) for clarity.
+- ✏️ **Inline Data Editing**  
+  Double-click cells to edit database records directly.
+
+## 🎯 Who is this for?
+- **Full-stack developers** managing local environments.
+- **Backend engineers** working with Docker + PostgreSQL.
+- **Startup teams** needing lightweight DevOps visibility.
 
 ## 🛠️ Tech Stack
 - **Frontend**: SvelteKit (Svelte 5 Runes) + Tailwind CSS v4 + Vite + Axios + vis-network
