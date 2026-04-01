@@ -19,6 +19,22 @@
 	let restoreClean = $state(false);
 	let showExportDropdown = $state(false);
 
+	let dbName = $state('postgres');
+	let typedConfirmation = $state('');
+
+	async function fetchDbConfig() {
+		try {
+			const res = await axios.get('http://127.0.0.1:8000/config/db');
+			dbName = res.data.db_name || 'postgres';
+		} catch (err) {
+			console.error('Failed to fetch db config', err);
+		}
+	}
+
+	onMount(() => {
+		fetchDbConfig();
+	});
+
 
 	function triggerQuery() {
 		if (!query.trim()) return;
@@ -39,9 +55,11 @@
 	function confirmFirst() {
 		showConfirmModal = false;
 		showRootModal = true;
+		typedConfirmation = ''; // Reset for the next step
 	}
 
 	function confirmRoot() {
+		if (typedConfirmation !== dbName) return;
 		showRootModal = false;
 		executeSQL();
 	}
@@ -687,9 +705,16 @@
 {#if showRootModal}
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rose-950/90 backdrop-blur-md"
+		role="presentation"
+		onkeydown={(e) => { if (e.key === 'Escape') showRootModal = false; }}
 	>
 		<div
 			class="bg-rose-950 border-2 border-rose-500 shadow-2xl shadow-rose-900/50 rounded-3xl p-8 max-w-sm w-full flex flex-col gap-6 animate-in zoom-in-95 duration-200"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Root Mutation Verification"
+			tabindex="-1"
+			onclick={(e) => e.stopPropagation()}
 		>
 			<div
 				class="w-16 h-16 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center text-3xl mx-auto animate-pulse"
@@ -705,7 +730,28 @@
 					undone.
 				</p>
 			</div>
-			<div class="flex gap-3 mt-4">
+
+			<div class="flex flex-col gap-2">
+				<p class="text-[10px] font-black text-rose-400/70 uppercase tracking-widest text-center">
+					Please type <span class="text-white select-all">{dbName}</span> to confirm.
+				</p>
+				<input
+					bind:value={typedConfirmation}
+					type="text"
+					placeholder={dbName}
+					onpaste={(e) => e.preventDefault()}
+					oncopy={(e) => e.preventDefault()}
+					onclick={(e) => e.stopPropagation()}
+					class="w-full px-4 py-3 rounded-xl bg-black/20 border-2 {typedConfirmation === dbName ? 'border-emerald-500/50' : 'border-rose-500/30'} text-white text-center font-bold uppercase tracking-widest text-sm focus:outline-none focus:border-rose-500/60 transition-all placeholder:opacity-20"
+				/>
+				{#if typedConfirmation && typedConfirmation !== dbName}
+					<p class="text-[9px] font-black text-rose-500 uppercase tracking-[0.2em] text-center animate-pulse">
+						Verification Mismatch
+					</p>
+				{/if}
+			</div>
+
+			<div class="flex gap-3">
 				<button
 					onclick={() => (showRootModal = false)}
 					class="flex-1 px-4 py-4 rounded-xl border border-rose-500/30 text-rose-300 font-bold uppercase tracking-widest text-xs hover:bg-rose-500/10 transition-colors"
@@ -713,7 +759,8 @@
 				>
 				<button
 					onclick={confirmRoot}
-					class="flex-1 px-4 py-4 rounded-xl bg-rose-600 text-white font-black uppercase tracking-widest text-xs hover:bg-rose-500 transition-colors shadow-lg shadow-rose-600/50"
+					disabled={typedConfirmation !== dbName}
+					class="flex-1 px-4 py-4 rounded-xl {typedConfirmation === dbName ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/40' : 'bg-rose-600 opacity-50 cursor-not-allowed'} text-white font-black uppercase tracking-widest text-xs transition-all shadow-lg"
 					>Proceed</button
 				>
 			</div>

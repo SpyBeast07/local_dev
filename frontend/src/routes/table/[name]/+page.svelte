@@ -39,6 +39,8 @@
 	let originalEditingPks = $state<any>({});
 	
 	let isDeleteModalOpen = $state(false);
+	let isTypedDeleteModalOpen = $state(false);
+	let typedDeleteConfirmation = $state('');
 	let rowToDelete = $state<any>(null);
 	let processingAction = $state(false);
 
@@ -281,7 +283,14 @@
 		}
 	}
 
+	function confirmFirstDelete() {
+		isDeleteModalOpen = false;
+		isTypedDeleteModalOpen = true;
+		typedDeleteConfirmation = '';
+	}
+
 	async function confirmDelete() {
+		if (typedDeleteConfirmation !== tableName) return;
 		processingAction = true;
 		try {
 			let pks: any = {};
@@ -292,7 +301,7 @@
 			});
 			
 			if (res.data.success) {
-				isDeleteModalOpen = false;
+				isTypedDeleteModalOpen = false;
 				rowToDelete = null;
 				await fetchData();
 			} else {
@@ -790,37 +799,86 @@
 </div>
 {/if}
 
-<!-- DESTRUCTIVE CONFIRM MODAL (DELETE ROW) -->
+<!-- DESTRUCTIVE CONFIRM MODAL (DELETE ROW) - STEP 1: WARNING -->
 {#if isDeleteModalOpen}
-<div class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-rose-950/90 backdrop-blur-md">
+<div class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-rose-950/80 backdrop-blur-sm">
 	<div class="bg-white dark:bg-slate-950 border-2 border-rose-500 shadow-2xl rounded-3xl p-10 max-w-lg w-full flex flex-col gap-6 animate-in zoom-in-95 duration-200">
-		<div class="w-20 h-20 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center text-4xl mx-auto shadow-inner shadow-rose-500/20 border border-rose-500/30">⚠️</div>
+		<div class="w-16 h-16 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center text-4xl mx-auto border border-rose-500/20 shadow-inner shadow-rose-500/20">⚠️</div>
 		<div class="text-center space-y-3">
-			<h3 class="text-2xl font-black text-rose-600 dark:text-rose-500 uppercase tracking-tighter italic">Destructive Action Alert <br /> DROP ROW</h3>
-			<p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-relaxed">You are about to permanently delete a row from <span class="text-white font-black">{tableName}</span> bound by Primary Keys:</p>
+			<h3 class="text-xl font-black text-rose-600 dark:text-rose-500 uppercase tracking-tighter italic">Destructive Action Alert <br /> DROP ROW</h3>
+			<p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-relaxed">You are about to permanently delete a row from <span class="bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded text-slate-900 dark:text-white font-black italic">{tableName}</span> bound by:</p>
 			
 			<div class="bg-rose-50 dark:bg-rose-950/50 p-4 rounded-xl border border-rose-100 dark:border-rose-900 mt-4 text-left">
 				{#each primaryKeys as pk}
-					<div class="flex justify-between items-center py-1 border-b border-rose-100/10 last:border-0 text-sm font-mono text-rose-400">
-						<span class="font-bold opacity-70 uppercase text-[10px]">{pk} = </span>
-						<span class="font-black italic text-rose-300">{rowToDelete[pk]}</span>
+					<div class="flex justify-between items-center py-1.5 border-b border-rose-100/10 last:border-0 text-[11px] font-mono">
+						<span class="font-bold text-rose-600/70 uppercase text-[9px]">{pk} </span>
+						<span class="font-black text-rose-500 truncate ml-4 italic">{rowToDelete[pk]}</span>
 					</div>
 				{/each}
 			</div>
 		</div>
-		<div class="flex gap-4 mt-4">
-			<button onclick={() => {isDeleteModalOpen = false; rowToDelete = null;}} disabled={processingAction} class="flex-1 px-4 py-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-black uppercase tracking-widest text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancel</button>
-			<button onclick={confirmDelete} disabled={processingAction} class="flex-1 px-4 py-4 rounded-xl bg-rose-600 text-white font-black uppercase tracking-widest text-xs hover:bg-rose-700 transition-colors shadow-xl shadow-rose-600/30">
-				{#if processingAction}
-					...
-				{:else}
-					Acknowledge & Delete
-				{/if}
+		<div class="flex gap-4 mt-2">
+			<button onclick={() => {isDeleteModalOpen = false; rowToDelete = null;}} class="flex-1 px-4 py-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancel</button>
+			<button onclick={confirmFirstDelete} class="flex-1 px-4 py-4 rounded-xl bg-rose-500 text-white font-black uppercase tracking-widest text-[10px] hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/30">
+				Next Step ▾
 			</button>
 		</div>
 	</div>
 </div>
 {/if}
+
+<!-- DESTRUCTIVE CONFIRM MODAL (DELETE ROW) - STEP 2: TYPED VERIFICATION -->
+{#if isTypedDeleteModalOpen}
+<div
+	class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-rose-950/90 backdrop-blur-md"
+	role="presentation"
+	onclick={() => {isTypedDeleteModalOpen = false; rowToDelete = null;}}
+	onkeydown={(e) => { if (e.key === 'Escape') { isTypedDeleteModalOpen = false; rowToDelete = null; } }}
+>
+	<div
+		class="bg-rose-950 border-2 border-rose-500 shadow-2xl shadow-rose-900/50 rounded-3xl p-10 max-w-sm w-full flex flex-col gap-6 animate-in zoom-in-95 duration-200"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Final Verification"
+		tabindex="-1"
+		onclick={(e) => e.stopPropagation()}
+		onkeydown={(e) => e.stopPropagation()}
+	>
+		<div class="w-16 h-16 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center text-4xl mx-auto animate-pulse shadow-inner shadow-rose-500/30">☢️</div>
+		<div class="text-center space-y-3">
+			<h3 class="text-2xl font-black text-white uppercase tracking-tighter italic">FINAL VERIFICATION</h3>
+			<p class="text-[10px] font-bold text-rose-300 uppercase tracking-widest leading-relaxed">Please type <span class="text-white select-all">{tableName}</span> below to confirm this deletion.</p>
+		</div>
+
+		<div class="flex flex-col gap-1.5">
+			<input
+				bind:value={typedDeleteConfirmation}
+				type="text"
+				placeholder="Table Name"
+				onpaste={(e) => e.preventDefault()}
+				oncopy={(e) => e.preventDefault()}
+				onclick={(e) => e.stopPropagation()}
+				class="w-full px-4 py-4 rounded-xl bg-black/20 border-2 {typedDeleteConfirmation === tableName ? 'border-emerald-500/50' : 'border-rose-500/30'} text-white text-center font-bold uppercase tracking-widest text-xs focus:outline-none focus:border-rose-500/60 transition-all placeholder:opacity-20"
+			/>
+			{#if typedDeleteConfirmation && typedDeleteConfirmation !== tableName}
+				<p class="text-[9px] font-black text-rose-500 uppercase tracking-[0.2em] text-center animate-pulse">Verification Mismatch</p>
+			{/if}
+		</div>
+
+		<div class="flex gap-4 mt-2">
+			<button onclick={() => {isTypedDeleteModalOpen = false; rowToDelete = null;}} disabled={processingAction} class="flex-1 px-4 py-4 rounded-xl border border-rose-500/30 text-rose-300 font-bold uppercase tracking-widest text-[10px] hover:bg-rose-500/10 transition-colors">Abort</button>
+			<button 
+				onclick={confirmDelete}
+				disabled={processingAction || typedDeleteConfirmation !== tableName}
+				class="flex-1 px-4 py-4 rounded-xl {typedDeleteConfirmation === tableName ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/40' : 'bg-rose-600 opacity-50 cursor-not-allowed'} text-white font-black uppercase tracking-widest text-[10px] transition-all shadow-lg"
+			>
+				{#if processingAction} ... {:else} Confirm & Drop {/if}
+			</button>
+		</div>
+	</div>
+</div>
+{/if}
+
 
 <!-- COLUMN PICKER EXPORT MODAL -->
 {#if showColumnPicker}
