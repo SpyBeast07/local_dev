@@ -432,6 +432,18 @@
 						Insert Row
 					</button>
 
+					<button
+						onclick={fetchData}
+						disabled={loading}
+						title="Refresh table data"
+						class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-400/30 text-slate-500 dark:text-slate-400 text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+					>
+						<svg class="w-4 h-4 {loading ? 'animate-spin' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+						</svg>
+						{loading ? 'Refreshing...' : 'Refresh'}
+					</button>
+
 					<div class="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
 						<span>Rows {offset + 1}-{Math.min(offset + pageSize, totalRows)} of {totalRows}</span>
 						
@@ -442,6 +454,7 @@
 						</div>
 					</div>
 				</div>
+
 
 				<div class="overflow-x-auto custom-scrollbar">
 					<table class="min-w-full text-left border-collapse whitespace-nowrap">
