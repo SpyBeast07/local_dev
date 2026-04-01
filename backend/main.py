@@ -1,7 +1,9 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File, Query
+from fastapi.responses import StreamingResponse, JSONResponse
 from dotenv import load_dotenv
 import os
 import json
+import io
 from pydantic import BaseModel
 from services.docker import (
     get_containers, get_container_logs, manage_container, get_container_stats,
@@ -10,6 +12,7 @@ from services.docker import (
 )
 from services.ports import get_ports, kill_port_process
 from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config
+from services.backups import backup_db, restore_db
 
 load_dotenv()
 
@@ -23,6 +26,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 @app.get("/")
@@ -149,6 +153,30 @@ class QueryPayload(BaseModel):
 @app.post("/db/query")
 def run_query(payload: QueryPayload):
     return execute_raw_query(payload.query)
+
+@app.get("/db/backup")
+def get_db_backup():
+    result = backup_db()
+    if not result["success"]:
+        return JSONResponse(status_code=500, content=result)
+    
+    # Simple streaming of the SQL content
+    return StreamingResponse(
+        io.BytesIO(result["sql"].encode()),
+        media_type="application/sql",
+        headers={"Content-Disposition": f"attachment; filename={result['filename']}"}
+    )
+
+@app.post("/db/restore")
+async def post_db_restore(file: UploadFile = File(...), clean: bool = Query(False)):
+    content = await file.read()
+    try:
+        sql_text = content.decode("utf-8")
+        return restore_db(sql_text, clean_schema=clean)
+    except Exception as e:
+        return {"success": False, "error": f"Failed to decode file: {str(e)}"}
+
+
 
 @app.get("/config/db")
 def get_db_config():

@@ -1,25 +1,30 @@
 <script lang="ts">
-	import { onMount } from "svelte";
-	import axios from "axios";
+	import { onMount } from 'svelte';
+	import axios from 'axios';
+	import { fade } from 'svelte/transition';
 
 	let tables = $state<string[]>([]);
 	let loading = $state(true);
 
-	let query = $state("");
+	let query = $state('');
 	let queryResult = $state<any>(null);
 	let queryLoading = $state(false);
 	let showConfirmModal = $state(false);
 	let showRootModal = $state(false);
 	let queryTrace = $state<any>(null);
+	let backupLoading = $state(false);
+	let restoreLoading = $state(false);
+	let showRestoreModal = $state(false);
+	let restoreFile = $state<File | null>(null);
+	let restoreClean = $state(false);
 
 	function triggerQuery() {
 		if (!query.trim()) return;
 
-		const cleanQuery = query
-			.replace(/--.*$/gm, '')
-			.replace(/\/\*[\s\S]*?\*\//g, '');
+		const cleanQuery = query.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
 
-		const destructiveKeywords = /\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|RENAME|GRANT|REVOKE)\b/i;
+		const destructiveKeywords =
+			/\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|RENAME|GRANT|REVOKE)\b/i;
 		const isDangerous = cleanQuery.match(destructiveKeywords);
 
 		if (isDangerous) {
@@ -39,21 +44,108 @@
 		executeSQL();
 	}
 
-	async function executeSQL() {
+	async function handleBackup() {
+		backupLoading = true;
+		try {
+			const res = await axios.get('http://127.0.0.1:8000/db/backup', { responseType: 'blob' });
+			const defaultName = `backup_${new Date().toISOString().split('T')[0]}.sql`;
+			let finalName = defaultName;
 
+			// Use File System Access API if available for "Save As" experience
+			if ('showSaveFilePicker' in window) {
+				try {
+					const handle = await (window as any).showSaveFilePicker({
+						suggestedName: defaultName,
+						types: [
+							{
+								description: 'SQL Backup File',
+								accept: { 'application/sql': ['.sql'] }
+							}
+						]
+					});
+					finalName = handle.name;
+					const writable = await handle.createWritable();
+					await writable.write(res.data);
+					await writable.close();
+				} catch (err: any) {
+					if (err.name === 'AbortError') return;
+					console.warn('Picker failed or cancelled, using fallback', err);
+
+					// If picker cancelled/failed, we still do the fallback download below
+					const url = window.URL.createObjectURL(new Blob([res.data]));
+					const link = document.createElement('a');
+					link.href = url;
+					link.setAttribute('download', defaultName);
+					document.body.appendChild(link);
+					link.click();
+					document.body.removeChild(link);
+				}
+			} else {
+				// Standard fallback download
+				const url = window.URL.createObjectURL(new Blob([res.data]));
+				const link = document.createElement('a');
+				link.href = url;
+				link.setAttribute('download', defaultName);
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+			}
+
+			// Show success in Execution Results
+			queryResult = {
+				success: true,
+				affected_rows: `Snapshot '${finalName}' Exported Successfully`
+			};
+		} catch (err) {
+			console.error('Backup failed', err);
+		} finally {
+			backupLoading = false;
+		}
+	}
+
+	async function handleRestore() {
+		if (!restoreFile) return;
+		restoreLoading = true;
+		showRestoreModal = false;
+		try {
+			const formData = new FormData();
+			formData.append('file', restoreFile);
+			// Pass the clean parameter to the API
+			const res = await axios.post(
+				`http://127.0.0.1:8000/db/restore?clean=${restoreClean}`,
+				formData
+			);
+			if (res.data.success) {
+				const refreshRes = await axios.get('http://127.0.0.1:8000/db/tables');
+				tables = Array.isArray(refreshRes.data) ? refreshRes.data : [];
+				queryResult = { success: true, affected_rows: 'Database Restored Successfully' };
+			} else {
+				queryResult = { success: false, error: res.data.error };
+			}
+		} catch (err: any) {
+			queryResult = { success: false, error: err.message };
+		} finally {
+			restoreLoading = false;
+			restoreFile = null;
+			restoreClean = false; // Reset for next time
+		}
+	}
+
+	async function executeSQL() {
 		queryLoading = true;
 		queryTrace = null;
 		try {
 			// Trigger Impact Trace in parallel
-			axios.post("http://127.0.0.1:8000/system/trace-query", { query })
-				.then(t => queryTrace = t.data)
-				.catch(e => console.error("Trace failed", e));
+			axios
+				.post('http://127.0.0.1:8000/system/trace-query', { query })
+				.then((t) => (queryTrace = t.data))
+				.catch((e) => console.error('Trace failed', e));
 
-			const res = await axios.post("http://127.0.0.1:8000/db/query", { query });
+			const res = await axios.post('http://127.0.0.1:8000/db/query', { query });
 			queryResult = res.data;
-			
+
 			// Auto refresh schemas
-			const tableRes = await axios.get("http://127.0.0.1:8000/db/tables");
+			const tableRes = await axios.get('http://127.0.0.1:8000/db/tables');
 			tables = Array.isArray(tableRes.data) ? tableRes.data : [];
 		} catch (err: any) {
 			queryResult = { success: false, error: err.message };
@@ -64,7 +156,7 @@
 
 	onMount(async () => {
 		try {
-			const res = await axios.get("http://127.0.0.1:8000/db/tables");
+			const res = await axios.get('http://127.0.0.1:8000/db/tables');
 			tables = Array.isArray(res.data) ? res.data : [];
 		} catch (err) {
 			console.error(err);
@@ -77,26 +169,53 @@
 <div class="flex flex-col gap-10 pb-20">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-center gap-4">
-			<a href="/" class="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all shadow-sm" aria-label="Back to dashboard">
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" /></svg>
+			<a
+				href="/"
+				class="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all shadow-sm"
+				aria-label="Back to dashboard"
+			>
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2.5"
+						d="M15 19l-7-7 7-7"
+					/></svg
+				>
 			</a>
-			<h1 class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase leading-none">Database Schema<span class="text-emerald-500 uppercase italic">.</span></h1>
+			<h1
+				class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase leading-none"
+			>
+				Database Schema<span class="text-emerald-500 uppercase italic">.</span>
+			</h1>
 		</div>
-		<p class="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs ml-14">Exploring all schema tables and metadata in PostgreSQL</p>
+		<p class="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs ml-14">
+			Exploring all schema tables and metadata in PostgreSQL
+		</p>
 	</header>
 
 	<!-- SQL RUNNER SECTION -->
-	<div class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-6 relative overflow-hidden w-full max-w-full">
+	<div
+		class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-6 relative overflow-hidden w-full max-w-full"
+	>
 		<div class="flex items-center justify-between">
-			<h2 class="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest italic flex items-center gap-2"><span class="text-emerald-500">ROOT</span> Raw SQL Editor</h2>
-			{#if queryLoading}
-				<div class="flex items-center gap-3 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">
-					<div class="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-					Evaluating...
+			<h2
+				class="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest italic flex items-center gap-2"
+			>
+				<span class="text-emerald-500">ROOT</span> Raw SQL Editor
+			</h2>
+			{#if queryLoading || backupLoading || restoreLoading}
+				<div
+					class="flex items-center gap-3 text-[10px] font-bold text-emerald-500 uppercase tracking-widest"
+				>
+					<div
+						class="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"
+					></div>
+					Processing Payload...
 				</div>
 			{/if}
 		</div>
-		
+
 		<div class="flex flex-col gap-4">
 			<textarea
 				bind:value={query}
@@ -111,22 +230,72 @@
 				}}
 			></textarea>
 
-			<!-- Schema naming hint -->
-			<div class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-3 flex items-start gap-3">
-				<span class="text-amber-500 text-sm mt-0.5 shrink-0">⚠</span>
-				<div class="flex flex-col gap-1">
-					<p class="text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">Schema-Qualified Names Required</p>
-					<p class="text-[11px] font-bold text-amber-600/80 dark:text-amber-500/80 leading-relaxed">
-						PostgreSQL resolves unqualified names against <code class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded font-mono">public</code> only.
-						Use the <span class="font-black">SQL Ref</span> shown on each table card.
-					</p>
+			<!-- Schema naming hint & Portability tools -->
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div
+					class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-3 flex items-start gap-3"
+				>
+					<span class="text-amber-500 text-sm mt-0.5 shrink-0">⚠</span>
+					<div class="flex flex-col gap-1">
+						<p
+							class="text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest"
+						>
+							Schema-Qualified Names Required
+						</p>
+						<p
+							class="text-[11px] font-bold text-amber-600/80 dark:text-amber-500/80 leading-relaxed"
+						>
+							PostgreSQL resolves unqualified names against <code
+								class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded font-mono">public</code
+							>.
+						</p>
+					</div>
+				</div>
+
+				<div
+					class="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-3"
+				>
+					<div class="flex items-center justify-between">
+						<p
+							class="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] italic"
+						>
+							⚡ Database Portability
+						</p>
+						<div class="flex gap-2">
+							<button
+								onclick={handleBackup}
+								disabled={backupLoading}
+								class="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+							>
+								Export .sql
+							</button>
+							<label
+								class="bg-blue-500/10 hover:bg-blue-500 text-blue-600 dark:text-blue-400 hover:text-white px-3 py-1.5 rounded-lg border border-blue-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer"
+							>
+								Restore Payload
+								<input
+									type="file"
+									accept=".sql"
+									class="hidden"
+									onchange={(e) => {
+										restoreFile = e.currentTarget.files?.[0] || null;
+										if (restoreFile) showRestoreModal = true;
+									}}
+								/>
+							</label>
+						</div>
+					</div>
 				</div>
 			</div>
 
 			<div class="flex justify-between items-center">
-				<span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest"><kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">CMD</kbd> + <kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">ENTER</kbd> TO RUN</span>
-				<button 
-					onclick={triggerQuery} 
+				<span
+					class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest"
+					><kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">CMD</kbd> +
+					<kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">ENTER</kbd> TO RUN</span
+				>
+				<button
+					onclick={triggerQuery}
 					disabled={!query.trim() || queryLoading}
 					class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-8 py-3 rounded-xl text-white font-black tracking-widest uppercase transition-all flex justify-center items-center gap-2 text-xs shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:shadow-none"
 				>
@@ -137,29 +306,57 @@
 
 		<!-- SQL RESULTS GRID -->
 		{#if queryResult}
-			<div class="mt-4 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-4 overflow-hidden">
+			<div
+				class="mt-4 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-4 overflow-hidden"
+			>
 				<div class="flex items-center justify-between">
-					<h3 class="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">Execution Result</h3>
-					<button onclick={() => { queryResult = null; queryTrace = null; }} class="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase tracking-widest transition-colors">Clear</button>
+					<h3 class="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
+						Execution Result
+					</h3>
+					<button
+						onclick={() => {
+							queryResult = null;
+							queryTrace = null;
+						}}
+						class="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase tracking-widest transition-colors"
+						>Clear</button
+					>
 				</div>
-				
+
 				{#if !queryResult.success}
-					<div class="bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono break-all leading-relaxed whitespace-pre-wrap">
+					<div
+						class="bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono break-all leading-relaxed whitespace-pre-wrap"
+					>
 						{queryResult.error}
 					</div>
 				{:else}
 					<!-- New Trace Summary Section -->
 					{#if queryTrace}
-						<div class="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
-							<div class="flex items-center justify-between mb-3 border-b border-indigo-500/10 pb-2">
+						<div
+							class="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300"
+						>
+							<div
+								class="flex items-center justify-between mb-3 border-b border-indigo-500/10 pb-2"
+							>
 								<div class="flex items-center gap-2">
-									<span class="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] italic">⚡ Query Trace Summary</span>
-									<a href="/relations" class="text-[9px] font-black px-2 py-0.5 bg-indigo-500/10 text-indigo-500 rounded border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all uppercase tracking-widest">Jump to Graph</a>
+									<span
+										class="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] italic"
+										>⚡ Query Trace Summary</span
+									>
+									<a
+										href="/relations"
+										class="text-[9px] font-black px-2 py-0.5 bg-indigo-500/10 text-indigo-500 rounded border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all uppercase tracking-widest"
+										>Jump to Graph</a
+									>
 								</div>
-								<span class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border 
-									{queryTrace.severity === 'HIGH' ? 'bg-rose-500 text-white border-rose-600 animate-pulse' : 
-									 queryTrace.severity === 'MEDIUM' ? 'bg-orange-500 text-white border-orange-600' : 
-									 'bg-emerald-500 text-white border-emerald-600'}">
+								<span
+									class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border
+									{queryTrace.severity === 'HIGH'
+										? 'bg-rose-500 text-white border-rose-600 animate-pulse'
+										: queryTrace.severity === 'MEDIUM'
+											? 'bg-orange-500 text-white border-orange-600'
+											: 'bg-emerald-500 text-white border-emerald-600'}"
+								>
 									{queryTrace.severity} RisK
 								</span>
 							</div>
@@ -167,31 +364,53 @@
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div class="space-y-3">
 									<div>
-										<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Impacted Containers</div>
+										<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+											Impacted Containers
+										</div>
 										<div class="flex flex-wrap gap-1">
 											{#each queryTrace.containers as c}
-												<span class="text-[9px] px-2 py-0.5 bg-sky-500/10 text-sky-500 rounded border border-sky-500/20 font-bold uppercase">{c}</span>
+												<span
+													class="text-[9px] px-2 py-0.5 bg-sky-500/10 text-sky-500 rounded border border-sky-500/20 font-bold uppercase"
+													>{c}</span
+												>
 											{:else}
-												<span class="text-[9px] font-bold text-slate-400 italic">No container fallout detected</span>
+												<span class="text-[9px] font-bold text-slate-400 italic"
+													>No container fallout detected</span
+												>
 											{/each}
 										</div>
 									</div>
 									<div>
-										<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Downstream Tables</div>
+										<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+											Downstream Tables
+										</div>
 										<div class="flex flex-wrap gap-1">
 											{#each queryTrace.dependent_tables as t}
-												<span class="text-[9px] px-2 py-0.5 bg-rose-500/10 text-rose-500 rounded border border-rose-500/20 font-bold uppercase">{t.split('.').pop()}</span>
+												<span
+													class="text-[9px] px-2 py-0.5 bg-rose-500/10 text-rose-500 rounded border border-rose-500/20 font-bold uppercase"
+													>{t.split('.').pop()}</span
+												>
 											{:else}
-												<span class="text-[9px] font-bold text-slate-400 italic">No structural dependents</span>
+												<span class="text-[9px] font-bold text-slate-400 italic"
+													>No structural dependents</span
+												>
 											{/each}
 										</div>
 									</div>
 								</div>
-								<div class="bg-indigo-500/10 rounded-xl p-3 border border-indigo-500/10 flex flex-col justify-center">
-									<p class="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 italic leading-relaxed">
+								<div
+									class="bg-indigo-500/10 rounded-xl p-3 border border-indigo-500/10 flex flex-col justify-center"
+								>
+									<p
+										class="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 italic leading-relaxed"
+									>
 										{queryTrace.summary}
 									</p>
-									<p class="text-[9px] text-indigo-500 font-bold mt-2 uppercase tracking-widest opacity-60">Result set contains {queryResult.data?.length || 0} rows</p>
+									<p
+										class="text-[9px] text-indigo-500 font-bold mt-2 uppercase tracking-widest opacity-60"
+									>
+										Result set contains {queryResult.data?.length || 0} rows
+									</p>
 								</div>
 							</div>
 						</div>
@@ -199,40 +418,58 @@
 
 					{#if queryResult.columns && queryResult.data}
 						{#if queryResult.is_truncated}
-							<div class="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3">
+							<div
+								class="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3"
+							>
 								<span class="text-lg">🛑</span>
 								<span>Result Set Truncated at 1,000 Rows for Performance Safety.</span>
 							</div>
 						{/if}
-						
-						<div class="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto custom-scrollbar shadow-inner">
+
+						<div
+							class="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto custom-scrollbar shadow-inner"
+						>
 							<table class="w-full text-left border-collapse min-w-max">
 								<thead>
 									<tr>
 										{#each queryResult.columns as col}
-											<th class="p-4 text-[10px] bg-white dark:bg-slate-900 font-black text-slate-500 uppercase tracking-widest border-b border-r border-slate-200 dark:border-slate-800 whitespace-nowrap">{col}</th>
+											<th
+												class="p-4 text-[10px] bg-white dark:bg-slate-900 font-black text-slate-500 uppercase tracking-widest border-b border-r border-slate-200 dark:border-slate-800 whitespace-nowrap"
+												>{col}</th
+											>
 										{/each}
 									</tr>
 								</thead>
 								<tbody>
 									{#each queryResult.data as row}
-										<tr class="hover:bg-blue-50/50 dark:hover:bg-slate-900/50 transition-colors group">
+										<tr
+											class="hover:bg-blue-50/50 dark:hover:bg-slate-900/50 transition-colors group"
+										>
 											{#each queryResult.columns as col}
-												<td class="p-4 text-xs font-mono font-bold text-slate-600 dark:text-slate-300 border-b border-r border-slate-200 dark:border-slate-800 group-hover:border-blue-100 dark:group-hover:border-slate-700 whitespace-nowrap">{row[col] === null ? 'NULL' : String(row[col])}</td>
+												<td
+													class="p-4 text-xs font-mono font-bold text-slate-600 dark:text-slate-300 border-b border-r border-slate-200 dark:border-slate-800 group-hover:border-blue-100 dark:group-hover:border-slate-700 whitespace-nowrap"
+													>{row[col] === null ? 'NULL' : String(row[col])}</td
+												>
 											{/each}
 										</tr>
 									{/each}
 									{#if queryResult.data.length === 0}
 										<tr>
-											<td colspan={queryResult.columns.length} class="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">0 Rows Returned</td>
+											<td
+												colspan={queryResult.columns.length}
+												class="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest"
+												>0 Rows Returned</td
+											>
 										</tr>
 									{/if}
 								</tbody>
 							</table>
 						</div>
 					{:else}
-						<div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono">
-							SUCCESS: {queryResult.affected_rows} rows affected.
+						<div
+							class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono"
+						>
+							⚡ {queryResult.affected_rows}
 						</div>
 					{/if}
 				{/if}
@@ -240,10 +477,13 @@
 		{/if}
 	</div>
 
-
 	{#if loading}
-		<div class="flex items-center gap-4 text-emerald-600 dark:text-emerald-400 font-black animate-pulse uppercase tracking-wider text-sm ml-14">
-			<div class="w-6 h-6 border-4 border-current border-t-transparent rounded-full animate-spin"></div>
+		<div
+			class="flex items-center gap-4 text-emerald-600 dark:text-emerald-400 font-black animate-pulse uppercase tracking-wider text-sm ml-14"
+		>
+			<div
+				class="w-6 h-6 border-4 border-current border-t-transparent rounded-full animate-spin"
+			></div>
 			Exploring Schema...
 		</div>
 	{:else}
@@ -258,35 +498,79 @@
 					class="bg-white dark:bg-slate-900 rounded-[2rem] p-8 border border-slate-200/60 dark:border-slate-800 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-500 group flex flex-col gap-6"
 				>
 					<div class="flex justify-between items-start">
-						<div class="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center text-xl shadow-inner border border-emerald-100 dark:border-emerald-900/30">
-							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+						<div
+							class="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center text-xl shadow-inner border border-emerald-100 dark:border-emerald-900/30"
+						>
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+								><path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+								/></svg
+							>
 						</div>
 						<div class="flex items-center gap-2">
-							<span class="text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest leading-none {isPublic ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'}">
+							<span
+								class="text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest leading-none {isPublic
+									? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
+									: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'}"
+							>
 								{schema}
 							</span>
-							<div class="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-300 dark:text-slate-700 group-hover:text-emerald-500 transition-colors">
-								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
+							<div
+								class="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-300 dark:text-slate-700 group-hover:text-emerald-500 transition-colors"
+							>
+								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+									><path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2.5"
+										d="M9 5l7 7-7 7"
+									/></svg
+								>
 							</div>
 						</div>
 					</div>
 
 					<div>
-						<h3 class="text-2xl font-black text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors tracking-tight uppercase italic leading-none">{tableName}</h3>
+						<h3
+							class="text-2xl font-black text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors tracking-tight uppercase italic leading-none"
+						>
+							{tableName}
+						</h3>
 						<div class="flex items-center gap-2 mt-3">
 							<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 group-hover:animate-ping"></span>
-							<span class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">Table</span>
+							<span
+								class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none"
+								>Table</span
+							>
 						</div>
 					</div>
 
-					<div class="pt-4 border-t border-slate-50 dark:border-slate-800 mt-auto flex flex-col gap-1.5">
-						<span class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">SQL Ref</span>
-						<code class="text-[11px] font-mono font-bold {isPublic ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'} leading-none">{sqlRef}</code>
+					<div
+						class="pt-4 border-t border-slate-50 dark:border-slate-800 mt-auto flex flex-col gap-1.5"
+					>
+						<span
+							class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none"
+							>SQL Ref</span
+						>
+						<code
+							class="text-[11px] font-mono font-bold {isPublic
+								? 'text-emerald-600 dark:text-emerald-400'
+								: 'text-amber-600 dark:text-amber-400'} leading-none">{sqlRef}</code
+						>
 					</div>
 				</a>
 			{:else}
-				<div class="col-span-full py-20 flex flex-col items-center gap-6 text-slate-300 dark:text-slate-700">
-					<div class="text-8xl opacity-10 italic font-black uppercase tracking-tighter leading-none">Void</div>
+				<div
+					class="col-span-full py-20 flex flex-col items-center gap-6 text-slate-300 dark:text-slate-700"
+				>
+					<div
+						class="text-8xl opacity-10 italic font-black uppercase tracking-tighter leading-none"
+					>
+						Void
+					</div>
 					<p class="text-sm font-bold uppercase tracking-[0.3em]">No tables found</p>
 				</div>
 			{/each}
@@ -296,36 +580,161 @@
 
 <!-- FIRST CONFIRMATION MODAL -->
 {#if showConfirmModal}
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-	<div class="bg-white dark:bg-slate-950 border border-amber-500/30 shadow-2xl rounded-3xl p-8 max-w-sm w-full flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-200">
-		<div class="w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center text-3xl mx-auto shadow-inner shadow-amber-500/20">⚠️</div>
-		<div class="text-center space-y-2">
-			<h3 class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">Destructive Action Detected</h3>
-			<p class="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Are you sure you want to run this modifying SQL payload against the root database?</p>
-		</div>
-		<div class="flex gap-3">
-			<button onclick={() => showConfirmModal = false} class="flex-1 px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold uppercase tracking-widest text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancel</button>
-			<button onclick={confirmFirst} class="flex-1 px-4 py-3 rounded-xl bg-amber-500 text-white font-black uppercase tracking-widest text-xs hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/20">Acknowledge</button>
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm"
+	>
+		<div
+			class="bg-white dark:bg-slate-950 border border-amber-500/30 shadow-2xl rounded-3xl p-8 max-w-sm w-full flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-200"
+		>
+			<div
+				class="w-16 h-16 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center text-3xl mx-auto shadow-inner shadow-amber-500/20"
+			>
+				⚠️
+			</div>
+			<div class="text-center space-y-2">
+				<h3
+					class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic"
+				>
+					Destructive Action Detected
+				</h3>
+				<p class="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+					Are you sure you want to run this modifying SQL payload against the root database?
+				</p>
+			</div>
+			<div class="flex gap-3">
+				<button
+					onclick={() => (showConfirmModal = false)}
+					class="flex-1 px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold uppercase tracking-widest text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+					>Cancel</button
+				>
+				<button
+					onclick={confirmFirst}
+					class="flex-1 px-4 py-3 rounded-xl bg-amber-500 text-white font-black uppercase tracking-widest text-xs hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/20"
+					>Acknowledge</button
+				>
+			</div>
 		</div>
 	</div>
-</div>
 {/if}
 
 <!-- ROOT DOUBLE CONFIRMATION MODAL -->
 {#if showRootModal}
-<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rose-950/90 backdrop-blur-md">
-	<div class="bg-rose-950 border-2 border-rose-500 shadow-2xl shadow-rose-900/50 rounded-3xl p-8 max-w-sm w-full flex flex-col gap-6 animate-in zoom-in-95 duration-200">
-		<div class="w-16 h-16 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center text-3xl mx-auto animate-pulse">☢️</div>
-		<div class="text-center space-y-3">
-			<h3 class="text-2xl font-black text-white uppercase tracking-tighter italic">FINAL WARNING</h3>
-			<p class="text-xs font-bold text-rose-300 uppercase tracking-widest leading-relaxed">This action provides absolute mutability to root schemas and data arrays. It CANNOT be undone.</p>
-		</div>
-		<div class="flex gap-3 mt-4">
-			<button onclick={() => showRootModal = false} class="flex-1 px-4 py-4 rounded-xl border border-rose-500/30 text-rose-300 font-bold uppercase tracking-widest text-xs hover:bg-rose-500/10 transition-colors">Abort</button>
-			<button onclick={confirmRoot} class="flex-1 px-4 py-4 rounded-xl bg-rose-600 text-white font-black uppercase tracking-widest text-xs hover:bg-rose-500 transition-colors shadow-lg shadow-rose-600/50">Proceed</button>
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rose-950/90 backdrop-blur-md"
+	>
+		<div
+			class="bg-rose-950 border-2 border-rose-500 shadow-2xl shadow-rose-900/50 rounded-3xl p-8 max-w-sm w-full flex flex-col gap-6 animate-in zoom-in-95 duration-200"
+		>
+			<div
+				class="w-16 h-16 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center text-3xl mx-auto animate-pulse"
+			>
+				☢️
+			</div>
+			<div class="text-center space-y-3">
+				<h3 class="text-2xl font-black text-white uppercase tracking-tighter italic">
+					FINAL WARNING
+				</h3>
+				<p class="text-xs font-bold text-rose-300 uppercase tracking-widest leading-relaxed">
+					This action provides absolute mutability to root schemas and data arrays. It CANNOT be
+					undone.
+				</p>
+			</div>
+			<div class="flex gap-3 mt-4">
+				<button
+					onclick={() => (showRootModal = false)}
+					class="flex-1 px-4 py-4 rounded-xl border border-rose-500/30 text-rose-300 font-bold uppercase tracking-widest text-xs hover:bg-rose-500/10 transition-colors"
+					>Abort</button
+				>
+				<button
+					onclick={confirmRoot}
+					class="flex-1 px-4 py-4 rounded-xl bg-rose-600 text-white font-black uppercase tracking-widest text-xs hover:bg-rose-500 transition-colors shadow-lg shadow-rose-600/50"
+					>Proceed</button
+				>
+			</div>
 		</div>
 	</div>
-</div>
+{/if}
+
+<!-- RESTORE CONFIGURATION MODAL -->
+{#if showRestoreModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm"
+	>
+		<div
+			class="bg-white dark:bg-slate-950 border border-blue-500/30 shadow-2xl rounded-[2.5rem] p-10 max-w-md w-full flex flex-col gap-8 animate-in slide-in-from-bottom-12 duration-300"
+		>
+			<div
+				class="w-20 h-20 rounded-3xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-4xl mx-auto shadow-inner shadow-blue-500/20"
+			>
+				📥
+			</div>
+
+			<div class="text-center space-y-4">
+				<h3
+					class="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic"
+				>
+					Restore Payload
+				</h3>
+				<p class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] leading-relaxed">
+					Ready to inject <span class="text-blue-500 italic">{restoreFile?.name}</span> into the active
+					container.
+				</p>
+			</div>
+
+			<div
+				class="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col gap-4"
+			>
+				<label class="flex items-center gap-4 cursor-pointer group">
+					<input
+						type="checkbox"
+						bind:checked={restoreClean}
+						class="w-6 h-6 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-transparent text-blue-500 focus:ring-blue-500 transition-all cursor-pointer"
+					/>
+					<div class="flex flex-col">
+						<span
+							class="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-widest group-hover:text-blue-500 transition-colors"
+							>Wipe and Overwrite</span
+						>
+						<span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 leading-tight"
+							>Clear existing schema tables before restoration.</span
+						>
+					</div>
+				</label>
+
+				{#if restoreClean}
+					<div
+						class="bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl flex items-center gap-3 animate-in fade-in zoom-in-95"
+					>
+						<span class="text-lg">🔥</span>
+						<p
+							class="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest leading-tight"
+						>
+							Caution: All current tables in 'public' schema will be PERMANENTLY deleted.
+						</p>
+					</div>
+				{/if}
+			</div>
+
+			<div class="flex gap-4">
+				<button
+					onclick={() => {
+						showRestoreModal = false;
+						restoreFile = null;
+						restoreClean = false;
+					}}
+					class="flex-1 px-6 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+				>
+					Abort
+				</button>
+				<button
+					onclick={handleRestore}
+					class="flex-1 px-6 py-4 rounded-2xl bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20 active:scale-95"
+				>
+					Start Restore
+				</button>
+			</div>
+		</div>
+	</div>
 {/if}
 
 <style>
