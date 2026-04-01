@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from services.docker import (
     get_containers, get_container_logs, manage_container, get_container_stats,
     get_images, pull_image, delete_image, get_volumes, get_networks, deploy_container,
-    get_dependency_graph, get_impact_analysis
+    get_dependency_graph, get_impact_analysis, trace_query
 )
 from services.ports import get_ports, kill_port_process
 from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config
@@ -14,6 +14,16 @@ from services.db import get_tables, get_table_data, get_relations, load_config, 
 load_dotenv()
 
 app = FastAPI()
+
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/")
 def root():
@@ -23,7 +33,15 @@ def root():
 def dependency_graph():
     return get_dependency_graph()
 
+class QueryRequest(BaseModel):
+    query: str
+
+@app.post("/system/trace-query")
+async def register_trace_query(request: QueryRequest):
+    return trace_query(request.query)
+
 @app.get("/system/impact-analysis")
+
 def impact_analysis(table: str):
     return get_impact_analysis(table)
 

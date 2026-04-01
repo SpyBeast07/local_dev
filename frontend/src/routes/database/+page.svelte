@@ -10,17 +10,15 @@
 	let queryLoading = $state(false);
 	let showConfirmModal = $state(false);
 	let showRootModal = $state(false);
+	let queryTrace = $state<any>(null);
 
 	function triggerQuery() {
 		if (!query.trim()) return;
 
-		// 1. Strip Single-line Comments (-- ...)
-		// 2. Strip Multi-line Comments (/* ... */)
 		const cleanQuery = query
 			.replace(/--.*$/gm, '')
 			.replace(/\/\*[\s\S]*?\*\//g, '');
 
-		// Identify destructive/mutating keywords with word boundaries
 		const destructiveKeywords = /\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|RENAME|GRANT|REVOKE)\b/i;
 		const isDangerous = cleanQuery.match(destructiveKeywords);
 
@@ -42,8 +40,15 @@
 	}
 
 	async function executeSQL() {
+
 		queryLoading = true;
+		queryTrace = null;
 		try {
+			// Trigger Impact Trace in parallel
+			axios.post("http://127.0.0.1:8000/system/trace-query", { query })
+				.then(t => queryTrace = t.data)
+				.catch(e => console.error("Trace failed", e));
+
 			const res = await axios.post("http://127.0.0.1:8000/db/query", { query });
 			queryResult = res.data;
 			
@@ -114,7 +119,6 @@
 					<p class="text-[11px] font-bold text-amber-600/80 dark:text-amber-500/80 leading-relaxed">
 						PostgreSQL resolves unqualified names against <code class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded font-mono">public</code> only.
 						Use the <span class="font-black">SQL Ref</span> shown on each table card.
-						Tables in <code class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded font-mono">public</code> can be queried by short name — all others need <code class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded font-mono">schema.table</code>.
 					</p>
 				</div>
 			</div>
@@ -133,57 +137,109 @@
 
 		<!-- SQL RESULTS GRID -->
 		{#if queryResult}
-			<div class="mt-4 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-4">
+			<div class="mt-4 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-4 overflow-hidden">
 				<div class="flex items-center justify-between">
 					<h3 class="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">Execution Result</h3>
-					<button onclick={() => queryResult = null} class="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase tracking-widest transition-colors">Clear</button>
+					<button onclick={() => { queryResult = null; queryTrace = null; }} class="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase tracking-widest transition-colors">Clear</button>
 				</div>
 				
 				{#if !queryResult.success}
 					<div class="bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono break-all leading-relaxed whitespace-pre-wrap">
 						{queryResult.error}
 					</div>
-				{:else if queryResult.columns && queryResult.data}
-					{#if queryResult.is_truncated}
-						<div class="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3">
-							<span class="text-lg">🛑</span>
-							<span>Result Set Truncated at 1,000 Rows for Performance Safety.</span>
+				{:else}
+					<!-- New Trace Summary Section -->
+					{#if queryTrace}
+						<div class="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+							<div class="flex items-center justify-between mb-3 border-b border-indigo-500/10 pb-2">
+								<div class="flex items-center gap-2">
+									<span class="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] italic">⚡ Query Trace Summary</span>
+									<a href="/relations" class="text-[9px] font-black px-2 py-0.5 bg-indigo-500/10 text-indigo-500 rounded border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all uppercase tracking-widest">Jump to Graph</a>
+								</div>
+								<span class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border 
+									{queryTrace.severity === 'HIGH' ? 'bg-rose-500 text-white border-rose-600 animate-pulse' : 
+									 queryTrace.severity === 'MEDIUM' ? 'bg-orange-500 text-white border-orange-600' : 
+									 'bg-emerald-500 text-white border-emerald-600'}">
+									{queryTrace.severity} RisK
+								</span>
+							</div>
+
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div class="space-y-3">
+									<div>
+										<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Impacted Containers</div>
+										<div class="flex flex-wrap gap-1">
+											{#each queryTrace.containers as c}
+												<span class="text-[9px] px-2 py-0.5 bg-sky-500/10 text-sky-500 rounded border border-sky-500/20 font-bold uppercase">{c}</span>
+											{:else}
+												<span class="text-[9px] font-bold text-slate-400 italic">No container fallout detected</span>
+											{/each}
+										</div>
+									</div>
+									<div>
+										<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Downstream Tables</div>
+										<div class="flex flex-wrap gap-1">
+											{#each queryTrace.dependent_tables as t}
+												<span class="text-[9px] px-2 py-0.5 bg-rose-500/10 text-rose-500 rounded border border-rose-500/20 font-bold uppercase">{t.split('.').pop()}</span>
+											{:else}
+												<span class="text-[9px] font-bold text-slate-400 italic">No structural dependents</span>
+											{/each}
+										</div>
+									</div>
+								</div>
+								<div class="bg-indigo-500/10 rounded-xl p-3 border border-indigo-500/10 flex flex-col justify-center">
+									<p class="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 italic leading-relaxed">
+										{queryTrace.summary}
+									</p>
+									<p class="text-[9px] text-indigo-500 font-bold mt-2 uppercase tracking-widest opacity-60">Result set contains {queryResult.data?.length || 0} rows</p>
+								</div>
+							</div>
 						</div>
 					{/if}
-					
-					<div class="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto custom-scrollbar shadow-inner">
-						<table class="w-full text-left border-collapse min-w-max">
-							<thead>
-								<tr>
-									{#each queryResult.columns as col}
-										<th class="p-4 text-[10px] bg-white dark:bg-slate-900 font-black text-slate-500 uppercase tracking-widest border-b border-r border-slate-200 dark:border-slate-800 whitespace-nowrap">{col}</th>
-									{/each}
-								</tr>
-							</thead>
-							<tbody>
-								{#each queryResult.data as row}
-									<tr class="hover:bg-blue-50/50 dark:hover:bg-slate-900/50 transition-colors group">
+
+					{#if queryResult.columns && queryResult.data}
+						{#if queryResult.is_truncated}
+							<div class="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3">
+								<span class="text-lg">🛑</span>
+								<span>Result Set Truncated at 1,000 Rows for Performance Safety.</span>
+							</div>
+						{/if}
+						
+						<div class="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto custom-scrollbar shadow-inner">
+							<table class="w-full text-left border-collapse min-w-max">
+								<thead>
+									<tr>
 										{#each queryResult.columns as col}
-											<td class="p-4 text-xs font-mono font-bold text-slate-600 dark:text-slate-300 border-b border-r border-slate-200 dark:border-slate-800 group-hover:border-blue-100 dark:group-hover:border-slate-700 whitespace-nowrap">{row[col] === null ? 'NULL' : String(row[col])}</td>
+											<th class="p-4 text-[10px] bg-white dark:bg-slate-900 font-black text-slate-500 uppercase tracking-widest border-b border-r border-slate-200 dark:border-slate-800 whitespace-nowrap">{col}</th>
 										{/each}
 									</tr>
-								{/each}
-								{#if queryResult.data.length === 0}
-									<tr>
-										<td colspan={queryResult.columns.length} class="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">0 Rows Returned</td>
-									</tr>
-								{/if}
-							</tbody>
-						</table>
-					</div>
-				{:else}
-					<div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono">
-						SUCCESS: {queryResult.affected_rows} rows affected.
-					</div>
+								</thead>
+								<tbody>
+									{#each queryResult.data as row}
+										<tr class="hover:bg-blue-50/50 dark:hover:bg-slate-900/50 transition-colors group">
+											{#each queryResult.columns as col}
+												<td class="p-4 text-xs font-mono font-bold text-slate-600 dark:text-slate-300 border-b border-r border-slate-200 dark:border-slate-800 group-hover:border-blue-100 dark:group-hover:border-slate-700 whitespace-nowrap">{row[col] === null ? 'NULL' : String(row[col])}</td>
+											{/each}
+										</tr>
+									{/each}
+									{#if queryResult.data.length === 0}
+										<tr>
+											<td colspan={queryResult.columns.length} class="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">0 Rows Returned</td>
+										</tr>
+									{/if}
+								</tbody>
+							</table>
+						</div>
+					{:else}
+						<div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono">
+							SUCCESS: {queryResult.affected_rows} rows affected.
+						</div>
+					{/if}
 				{/if}
 			</div>
 		{/if}
 	</div>
+
 
 	{#if loading}
 		<div class="flex items-center gap-4 text-emerald-600 dark:text-emerald-400 font-black animate-pulse uppercase tracking-wider text-sm ml-14">

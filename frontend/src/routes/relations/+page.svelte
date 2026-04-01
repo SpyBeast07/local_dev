@@ -11,6 +11,9 @@
 	let impactData = $state<any>(null);
 	let nodesDataSet: any = null;
 	let edgesDataSet: any = null;
+	let queryInput = $state("");
+	let isTracing = $state(false);
+	let traceData = $state<any>(null);
 
 	onMount(async () => {
 		try {
@@ -26,7 +29,7 @@
 					...n,
 					group: n.type,
 					title: n.label,
-					originalColor: null // Store for reset
+					originalColor: null
 				})));
 				
 				edgesDataSet = new DataSet(backendEdges.map((e: any) => ({
@@ -43,8 +46,8 @@
 						container: {
 							shape: 'box',
 							color: {
-								border: '#0ea5e9', // sky-500
-								background: '#0c4a6e', // sky-900
+								border: '#0ea5e9',
+								background: '#0c4a6e',
 								highlight: '#38bdf8'
 							},
 							font: { color: '#f0f9ff', face: 'Outfit', size: 16, bold: true }
@@ -53,8 +56,8 @@
 							shape: 'dot',
 							size: 20,
 							color: {
-								border: '#f59e0b', // amber-500
-								background: '#78350f', // amber-900
+								border: '#f59e0b',
+								background: '#78350f',
 								highlight: '#fbbf24'
 							},
 							font: { color: '#fef3c7', face: 'Outfit', size: 12 }
@@ -62,8 +65,8 @@
 						database: {
 							shape: 'database',
 							color: {
-								border: '#10b981', // emerald-500
-								background: '#064e3b', // emerald-900
+								border: '#10b981',
+								background: '#064e3b',
 								highlight: '#34d399'
 							},
 							font: { color: '#ecfdf5', face: 'Outfit', size: 18, bold: true }
@@ -71,8 +74,8 @@
 						table: {
 							shape: 'box',
 							color: {
-								border: '#6366f1', // indigo-500
-								background: '#1e1b4b', // indigo-900 
+								border: '#6366f1',
+								background: '#1e1b4b',
 								highlight: '#818cf8'
 							},
 							font: { color: '#eef2ff', face: 'Outfit', size: 14 },
@@ -145,27 +148,49 @@
 		}
 	});
 
-	function highlightImpact(impactIds: string[]) {
+	async function runTrace() {
+		if (!queryInput.trim()) return;
+		isTracing = true;
+		try {
+			const res = await axios.post("http://127.0.0.1:8000/system/trace-query", { query: queryInput });
+			traceData = res.data;
+			impactData = traceData;
+			highlightImpact(traceData.impact_ids, traceData.tables);
+		} catch (err) {
+			console.error("Trace failed:", err);
+		} finally {
+			isTracing = false;
+		}
+	}
+
+	function highlightImpact(impactIds: string[], originIds: string[] = []) {
 		if (!nodesDataSet || !edgesDataSet) return;
 		
 		const impactSet = new Set(impactIds);
+		const originSet = new Set(originIds.length > 0 ? originIds : (impactData?.table ? [impactData.table] : []));
 		
 		nodesDataSet.update(nodesDataSet.map((n: any) => {
 			const isImpacted = impactSet.has(n.id);
-			const isOrigin = n.id === impactData.table;
+			const isOrigin = originSet.has(n.id);
 			
 			let color = n.color;
 			if (isOrigin) {
 				color = { border: '#ef4444', background: '#7f1d1d', highlight: '#f87171' };
 			} else if (isImpacted && n.type === 'table') {
 				color = { border: '#f97316', background: '#7c2d12', highlight: '#fb923c' };
+			} else if (isImpacted && n.type === 'container') {
+				color = { border: '#0ea5e9', background: '#0c4a6e', highlight: '#38bdf8' };
 			}
 
 			return {
 				id: n.id,
 				opacity: isImpacted ? 1 : 0.1,
 				color: isImpacted ? color : { opacity: 0.1 },
-				shadow: { enabled: isImpacted, size: isOrigin ? 30 : 15, color: isOrigin ? 'rgba(239, 68, 68, 0.5)' : 'rgba(0,0,0,0.5)' }
+				shadow: { 
+					enabled: isImpacted, 
+					size: isOrigin ? 40 : 15, 
+					color: isOrigin ? 'rgba(239, 68, 68, 0.8)' : 'rgba(0,0,0,0.5)' 
+				}
 			};
 		}));
 
@@ -182,11 +207,12 @@
 	function resetHighlight() {
 		if (!nodesDataSet || !edgesDataSet) return;
 		impactData = null;
+		traceData = null;
 		
 		nodesDataSet.update(nodesDataSet.map((n: any) => ({
 			id: n.id,
 			opacity: 1,
-			color: null, // Reset to group default
+			color: null,
 			shadow: { enabled: true, size: 10, color: 'rgba(0,0,0,0.5)' }
 		})));
 
@@ -200,6 +226,7 @@
 	function closePanel() {
 		selectedNode = null;
 		impactData = null;
+		traceData = null;
 		resetHighlight();
 		if (network) network.unselectAll();
 	}
@@ -216,7 +243,7 @@
 		<p class="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-[10px] ml-14">Infrastructure Topology & Service Mesh Visualization</p>
 	</header>
 
-	<div class="flex-1 flex gap-6 min-h-0">
+	<div class="flex-1 flex gap-6 min-h-0 relative">
 		<div class="relative flex-1 bg-white/50 dark:bg-slate-950/50 rounded-[2.5rem] p-4 border border-slate-200/60 dark:border-slate-800 shadow-inner overflow-hidden backdrop-blur-sm">
 			{#if loading}
 				<div class="absolute inset-0 flex items-center justify-center bg-slate-950/80 z-20 rounded-[2.5rem] backdrop-blur-md">
@@ -234,7 +261,6 @@
 				</div>
 			{/if}
 
-			<!-- Legend -->
 			<div class="absolute top-8 left-8 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-6 py-4 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-4">
 				<div class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">LEGEND</div>
 				<div class="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -257,12 +283,44 @@
 				</div>
 			</div>
 
-			<!-- Vis Network Container -->
 			<div bind:this={container} class="w-full h-full rounded-[2rem] focus:outline-none"></div>
+
+			<div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 w-[600px] bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 p-2 rounded-2xl shadow-2xl flex items-center gap-3 transition-all {queryInput ? 'ring-2 ring-indigo-500/30' : ''}">
+				<div class="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+				</div>
+				<input 
+					type="text" 
+					bind:value={queryInput}
+					onkeydown={(e) => e.key === 'Enter' && runTrace()}
+					placeholder="Enter SQL to trace infrastructure impact (e.g. SELECT * FROM users JOIN orders)..."
+					class="flex-1 bg-transparent border-none text-slate-200 placeholder:text-slate-500 font-mono text-sm focus:ring-0"
+				/>
+				<button 
+					onclick={runTrace}
+					disabled={isTracing || !queryInput}
+					class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2"
+				>
+					{#if isTracing}
+						<div class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+						Tracing
+					{:else}
+						Trace Query
+					{/if}
+				</button>
+				{#if impactData || traceData}
+					<button 
+						onclick={() => { queryInput = ""; resetHighlight(); }}
+						class="w-10 h-10 rounded-xl hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-colors"
+						aria-label="Reset view"
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+					</button>
+				{/if}
+			</div>
 		</div>
 
-		<!-- Side Panel -->
-		{#if selectedNode}
+		{#if selectedNode || impactData || traceData}
 			<div class="w-96 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 relative z-30">
 				<button 
 					onclick={closePanel}
@@ -273,18 +331,25 @@
 				</button>
 
 				<div class="p-8 pb-4">
-					<div class="flex items-center gap-3 mb-2">
-						{#if selectedNode.type === 'container'}
-							<span class="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-500 text-[10px] font-black uppercase tracking-widest border border-sky-500/20">Compute Node</span>
-						{:else if selectedNode.type === 'port'}
-							<span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-widest border border-amber-500/20">Network Gate</span>
-						{:else if selectedNode.type === 'database'}
-							<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">Persistent Storage</span>
-						{:else}
-							<span class="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">Relational Table</span>
-						{/if}
-					</div>
-					<h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight break-all">{selectedNode.label}</h2>
+					{#if traceData}
+						<div class="flex items-center gap-3 mb-2">
+							<span class="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">Query Flow Trace</span>
+						</div>
+						<h2 class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight line-clamp-2 italic">"{queryInput}"</h2>
+					{:else if selectedNode}
+						<div class="flex items-center gap-3 mb-2">
+							{#if selectedNode.type === 'container'}
+								<span class="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-500 text-[10px] font-black uppercase tracking-widest border border-sky-500/20">Compute Node</span>
+							{:else if selectedNode.type === 'port'}
+								<span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-widest border border-amber-500/20">Network Gate</span>
+							{:else if selectedNode.type === 'database'}
+								<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">Persistent Storage</span>
+							{:else}
+								<span class="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">Relational Table</span>
+							{/if}
+						</div>
+						<h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight break-all">{selectedNode.label}</h2>
+					{/if}
 				</div>
 
 				<div class="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar">
@@ -292,7 +357,7 @@
 						{#if impactData}
 							<section class="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 {impactData.severity === 'HIGH' ? 'animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.2)]' : ''}">
 								<div class="flex items-center justify-between mb-2">
-									<h3 class="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em]">🚨 Impact Analysis</h3>
+									<h3 class="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em]">🚨 {traceData ? 'Cloud Fallout' : 'Impact Analysis'}</h3>
 									<span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border 
 										{impactData.severity === 'HIGH' ? 'bg-rose-500 text-white border-rose-600' : 
 										 impactData.severity === 'MEDIUM' ? 'bg-orange-500 text-white border-orange-600' : 
@@ -323,7 +388,7 @@
 							</section>
 						{/if}
 
-						{#if selectedNode.metadata && !impactData}
+						{#if selectedNode && selectedNode.metadata && !traceData}
 							{#if selectedNode.type === 'container'}
 								<section>
 									<h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Service Details</h3>
@@ -338,7 +403,6 @@
 										</div>
 									</div>
 								</section>
-
 								<section>
 									<h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Environment</h3>
 									<div class="flex flex-col gap-2">
@@ -383,10 +447,13 @@
 									</div>
 								</section>
 							{/if}
-						{:else if !impactData}
+						{/if}
+						
+						{#if !impactData && !selectedNode && !traceData}
+
 							<div class="text-center py-20 text-slate-200 dark:text-slate-800">
 								<svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-								<p class="text-[10px] font-black uppercase tracking-widest">No Deep Metadata Available</p>
+								<p class="text-[10px] font-black uppercase tracking-widest">Select Node or Trace Query</p>
 							</div>
 						{/if}
 					</div>

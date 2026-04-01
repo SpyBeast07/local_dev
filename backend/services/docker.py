@@ -305,7 +305,88 @@ def get_dependency_graph():
             
     return {"nodes": list(nodes_map.values()), "edges": edges}
 
+import re
+
+def extract_tables(query: str) -> list[str]:
+    """Simple regex to extract table names from SQL."""
+    query = query.lower()
+    # Matches: FROM table, JOIN table, UPDATE table, INTO table, DELETE FROM table
+    patterns = [
+        r'from\s+([a-zA-Z0-9_.]+)',
+        r'join\s+([a-zA-Z0-9_.]+)',
+        r'update\s+([a-zA-Z0-9_.]+)',
+        r'into\s+([a-zA-Z0-9_.]+)',
+        r'delete\s+from\s+([a-zA-Z0-9_.]+)'
+    ]
+    
+    tables = set()
+    for p in patterns:
+        matches = re.findall(p, query)
+        for m in matches:
+            # Clean possible quotes or dots
+            t = m.strip('"` ')
+            if t:
+                tables.add(t)
+    return list(tables)
+
+def trace_query(query: str):
+    """Trace the impact of all tables involved in a query."""
+    tables = extract_tables(query)
+    all_impact_ids = set()
+    all_dependent_tables = set()
+    all_containers = set()
+    all_services = set()
+    
+    # We need to match extracted table names (which might be unqualified) 
+    # to the table IDs in our graph (usually public.tablename)
+    graph = get_dependency_graph()
+    available_tables = [n["id"] for n in graph["nodes"] if n["type"] == "table"]
+    
+    matched_ids = []
+    for t in tables:
+        # Check for direct match or partial match (if unqualified)
+        found = False
+        for aid in available_tables:
+            if aid == t or aid.endswith(f".{t}"):
+                matched_ids.append(aid)
+                found = True
+                break
+    
+    for tid in matched_ids:
+        impact = get_impact_analysis(tid)
+        all_impact_ids.update(impact.get("impact_ids", []))
+        all_dependent_tables.update(impact.get("dependent_tables", []))
+        all_containers.update(impact.get("containers", []))
+        all_services.update(impact.get("services", []))
+        
+    # Collective Score
+    unique_tables = len(all_dependent_tables)
+    unique_containers = len(all_containers)
+    unique_services = len(all_services)
+    
+    total_score = (unique_tables * 1) + (unique_containers * 3) + (unique_services * 2)
+    
+    if total_score >= 10:
+        severity = "HIGH"
+    elif total_score >= 5:
+        severity = "MEDIUM"
+    else:
+        severity = "LOW"
+        
+    return {
+        "query": query,
+        "tables": matched_ids,
+        "impact_ids": list(all_impact_ids),
+        "dependent_tables": list(all_dependent_tables),
+        "containers": list(all_containers),
+        "services": list(all_services),
+        "severity": severity,
+        "score": total_score,
+        "summary": f"Query touches {len(matched_ids)} table(s). Total blast radius: {len(all_dependent_tables)} table(s) and {len(all_containers)} container(s) impacted ({severity} risk)."
+    }
+
 def get_impact_analysis(table_name: str):
+
     """Compute the blast radius of a table failure."""
     graph = get_dependency_graph()
     nodes = graph["nodes"]

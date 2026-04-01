@@ -370,21 +370,33 @@ def execute_raw_query(query: str):
                 is_truncated = False
                 
                 if cursor.description:
-                    columns = [desc[0] for desc in cursor.description]
+                    raw_columns = [desc[0] for desc in cursor.description]
                     
-                    # 3. Limit to 1000 rows to prevent memory exhaustion in frontend/backend
-                    rows = cursor.fetchmany(1001) # Fetch one extra to check for truncation
+                    # De-duplicate column names to prevent key collisions in JSON/dicts
+                    columns = []
+                    seen_counts = {}
+                    for col in raw_columns:
+                        if col not in seen_counts:
+                            seen_counts[col] = 0
+                            columns.append(col)
+                        else:
+                            seen_counts[col] += 1
+                            columns.append(f"{col}_{seen_counts[col]}")
+
+                    # 3. Limit to 1000 rows to prevent memory exhaustion
+                    rows = cursor.fetchmany(1001) 
                     
                     if len(rows) > 1000:
                         is_truncated = True
                         rows = rows[:1000]
                         
-                    # Apply serialization sanitization to each row
                     data = []
                     for row in rows:
+                        # Use our de-duplicated 'columns' for the dictionary keys
                         mapped_row = dict(zip(columns, row))
                         sanitized_row = {k: _make_serializable(v) for k, v in mapped_row.items()}
                         data.append(sanitized_row)
+
                 
                 # Commit any data mutations
                 conn.commit()
