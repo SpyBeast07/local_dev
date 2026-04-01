@@ -7,7 +7,7 @@ from services.docker import (
     get_containers, get_container_logs, manage_container, get_container_stats,
     get_images, pull_image, delete_image, get_volumes, get_networks, deploy_container
 )
-from services.ports import get_ports
+from services.ports import get_ports, kill_port_process
 from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row
 
 load_dotenv()
@@ -72,6 +72,13 @@ def container_deploy(payload: DeployPayload):
 @app.get("/ports")
 def ports():
     return get_ports()
+
+class KillPortPayload(BaseModel):
+    pid: str
+
+@app.post("/ports/kill")
+def kill_port(payload: KillPortPayload):
+    return kill_port_process(payload.pid)
 
 @app.get("/db/tables")
 def tables():

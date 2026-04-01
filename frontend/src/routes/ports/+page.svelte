@@ -16,8 +16,12 @@
 	
 	let loading = $state(true);
 	let showOther = $state(false);
+	
+	let isKillModalOpen = $state(false);
+	let selectedPort = $state<Port | null>(null);
+	let processingKill = $state(false);
 
-	onMount(async () => {
+	async function fetchPorts() {
 		try {
 			const res = await axios.get("http://127.0.0.1:8000/ports");
 			ports = Array.isArray(res.data) ? res.data : [];
@@ -28,13 +32,34 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function killProcess() {
+		if (!selectedPort) return;
+		processingKill = true;
+		try {
+			const res = await axios.post("http://127.0.0.1:8000/ports/kill", { pid: selectedPort.pid });
+			if (res.data.success) {
+				isKillModalOpen = false;
+				await fetchPorts();
+			} else {
+				alert("Failed to kill process: " + res.data.error);
+			}
+		} catch (err) {
+			console.error(err);
+		} finally {
+			processingKill = false;
+			selectedPort = null;
+		}
+	}
+
+	onMount(() => {
+		fetchPorts();
 	});
 </script>
 
 {#snippet portCard(p: Port)}
-	<a 
-		href={`http://localhost:${p.port}`}
-		target="_blank"
+	<div 
 		class="bg-white dark:bg-slate-900 rounded-[2rem] p-8 border shadow-sm transition-all duration-500 group flex flex-col gap-6 relative overflow-hidden
 			{p.is_important 
 				? 'border-slate-200/60 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-800 hover:bg-amber-50/10 dark:hover:bg-amber-900/10' 
@@ -51,9 +76,27 @@
 				</span>
 				<span class="text-[10px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-[0.2em] mt-2 italic leading-none">{p.protocol}</span>
 			</div>
-			<div class="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-300 dark:text-slate-700 transition-all duration-300
-				{p.is_important ? 'group-hover:bg-amber-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-amber-500/20' : 'group-hover:bg-slate-700 group-hover:text-white'}">
-				<svg class="w-5 h-5 group-hover:scale-125 transition-transform duration-300 {p.is_important ? 'group-hover:rotate-12' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+
+			<div class="flex items-center gap-2">
+				<!-- KILL BUTTON -->
+				<button 
+					onclick={(e) => { e.preventDefault(); selectedPort = p; isKillModalOpen = true; }}
+					class="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900 text-rose-500 dark:text-rose-400 opacity-20 group-hover:opacity-100 hover:bg-rose-500 hover:text-white transition-all duration-300 shadow-sm"
+					title="Kill Process"
+					aria-label={`Kill process ${p.process} on port ${p.port}`}
+				>
+					<svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+				</button>
+
+				<a 
+					href={`http://localhost:${p.port}`}
+					target="_blank"
+					class="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-300 dark:text-slate-700 transition-all duration-300
+						{p.is_important ? 'group-hover:bg-amber-500 group-hover:text-white group-hover:shadow-lg group-hover:shadow-amber-500/20' : 'group-hover:bg-slate-700 group-hover:text-white'}"
+					aria-label={`Open localhost:${p.port} in new tab`}
+				>
+					<svg class="w-5 h-5 group-hover:scale-125 transition-transform duration-300 {p.is_important ? 'group-hover:rotate-12' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+				</a>
 			</div>
 		</div>
 
@@ -71,7 +114,7 @@
 		<div class="mt-auto pt-4 border-t {p.is_important ? 'border-slate-50 dark:border-slate-800' : 'border-slate-100 dark:border-slate-800/50'}">
 			<span class="text-[9px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[0.3em] italic leading-none">Open Gateway</span>
 		</div>
-	</a>
+	</div>
 {/snippet}
 
 <div class="flex flex-col gap-10 pb-20">
@@ -139,3 +182,48 @@
 		{/if}
 	{/if}
 </div>
+
+<!-- KILL CONFIRM MODAL -->
+{#if isKillModalOpen && selectedPort}
+<div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-rose-950/90 backdrop-blur-md">
+	<div class="bg-white dark:bg-slate-950 border-2 border-rose-500 shadow-2xl rounded-[3rem] p-10 max-w-lg w-full flex flex-col gap-8 animate-in zoom-in-95 duration-200 text-center">
+		<div class="w-20 h-20 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center text-4xl mx-auto shadow-inner shadow-rose-500/20 border border-rose-500/30">💀</div>
+		
+		<div class="space-y-4">
+			<h3 class="text-3xl font-black text-rose-600 dark:text-rose-500 uppercase tracking-tighter italic leading-none">Sudden Termination</h3>
+			<p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] leading-relaxed">You are about to forcefully close gateway <span class="text-rose-600 font-black">{selectedPort.port}</span> by killing process <span class="text-rose-600 font-black">PID {selectedPort.pid}</span> ({selectedPort.process}).</p>
+		</div>
+
+		<div class="bg-rose-50 dark:bg-rose-900/10 rounded-2xl p-6 border border-rose-100 dark:border-rose-900 text-left">
+			<p class="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest mb-2">Process Signature</p>
+			<div class="font-mono text-xs text-rose-500 space-y-1">
+				<p>NAME: {selectedPort.process}</p>
+				<p>PID:  {selectedPort.pid}</p>
+				<p>PORT: {selectedPort.port}</p>
+			</div>
+		</div>
+
+		<div class="flex gap-4">
+			<button 
+				onclick={() => { isKillModalOpen = false; selectedPort = null; }}
+				disabled={processingKill}
+				class="flex-1 px-6 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-black uppercase tracking-widest text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-all disabled:opacity-50"
+			>
+				Abort
+			</button>
+			<button 
+				onclick={killProcess}
+				disabled={processingKill}
+				class="flex-1 px-6 py-4 rounded-2xl bg-rose-600 text-white font-black uppercase tracking-widest text-xs hover:bg-rose-700 transition-all shadow-xl shadow-rose-600/30 disabled:opacity-50 flex items-center justify-center gap-2"
+			>
+				{#if processingKill}
+					<div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+				{:else}
+					Acknowledge & Kill
+				{/if}
+			</button>
+		</div>
+	</div>
+</div>
+{/if}
+

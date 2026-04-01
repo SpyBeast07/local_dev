@@ -1,4 +1,6 @@
 import subprocess
+import os
+import signal
 
 
 def get_ports():
@@ -75,3 +77,11 @@ def get_ports():
 
     except Exception as e:
         return {"error": str(e)}
+
+
+def kill_port_process(pid: str):
+    try:
+        os.kill(int(pid), signal.SIGTERM)
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
