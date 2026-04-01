@@ -193,7 +193,16 @@ def insert_row(table_name: str, payload: dict):
         cursor = conn.cursor()
         
         # Filter out empty strings to allow Postgres defaults (like SERIAL) to trigger
-        filtered_payload = {k: v for k, v in payload.items() if v != ""}
+        # Also stringify dicts/lists for psycopg2 adaptation
+        filtered_payload = {}
+        for k, v in payload.items():
+            if v == "":
+                continue
+            if isinstance(v, (dict, list)):
+                filtered_payload[k] = json.dumps(v)
+            else:
+                filtered_payload[k] = v
+
         if not filtered_payload:
             return {"success": False, "error": "No valid data provided for insert."}
         
@@ -231,11 +240,19 @@ def update_row(table_name: str, primary_keys: dict, payload: dict):
             # If front-end passes empty string for an existing row edit, assume they meant NULL
             if v == "":
                 v = None
+            
+            # Stringify dicts/lists for psycopg2 adaptation
+            if isinstance(v, (dict, list)):
+                v = json.dumps(v)
+                
             set_cols.append(f'"{k}" = %s')
             values.append(v)
             
         where_cols = []
         for k, v in primary_keys.items():
+            # Stringify dicts/lists for psycopg2 adaptation if PK is JSON
+            if isinstance(v, (dict, list)):
+                v = json.dumps(v)
             where_cols.append(f'"{k}" = %s')
             values.append(v)
             

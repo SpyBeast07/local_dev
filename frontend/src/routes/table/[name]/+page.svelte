@@ -113,7 +113,13 @@
 	function openInsertModal() {
 		editMode = "insert";
 		let blankRow: any = {};
-		structure.forEach(c => blankRow[c.name] = "");
+		structure.forEach(c => {
+			if (c.type.toLowerCase().includes('json')) {
+				blankRow[c.name] = "{}";
+			} else {
+				blankRow[c.name] = "";
+			}
+		});
 		editingRow = blankRow;
 		isEditModalOpen = true;
 	}
@@ -124,7 +130,26 @@
 			return;
 		}
 		editMode = "update";
-		editingRow = { ...row };
+		
+		// Clone and format for inputs
+		let formattedRow = { ...row };
+		structure.forEach(col => {
+			const val = row[col.name];
+			if (val === null) return;
+
+			// JSON stringification for the textarea/input
+			if (typeof val === 'object') {
+				formattedRow[col.name] = JSON.stringify(val, null, 2);
+			} 
+			// Date formatting for datetime-local (requires YYYY-MM-DDThh:mm)
+			else if (col.type.toLowerCase().includes('timestamp') || col.type.toLowerCase().includes('date')) {
+				try {
+					formattedRow[col.name] = new Date(val).toISOString().slice(0, 16);
+				} catch(e) { /* ignore cast errors */ }
+			}
+		});
+
+		editingRow = formattedRow;
 		originalEditingPks = {};
 		primaryKeys.forEach(pk => originalEditingPks[pk] = row[pk]);
 		isEditModalOpen = true;
@@ -142,15 +167,30 @@
 	async function saveRow() {
 		processingAction = true;
 		try {
+			// Prepare payload by parsing JSON strings back to objects
+			let finalPayload = { ...editingRow };
+			for (const col of structure) {
+				const val = editingRow[col.name];
+				if (typeof val === 'string' && (col.type.toLowerCase().includes('json') || col.type.toLowerCase().includes('object'))) {
+					try {
+						finalPayload[col.name] = JSON.parse(val);
+					} catch (e) {
+						alert(`Invalid JSON in field "${col.name}". Please correct it before committing.`);
+						processingAction = false;
+						return;
+					}
+				}
+			}
+
 			let res;
 			if (editMode === "insert") {
 				res = await axios.post(`http://127.0.0.1:8000/db/table/${tableName}/row`, {
-					payload: editingRow
+					payload: finalPayload
 				});
 			} else {
 				res = await axios.put(`http://127.0.0.1:8000/db/table/${tableName}/row`, {
 					primary_keys: originalEditingPks,
-					payload: editingRow
+					payload: finalPayload
 				});
 			}
 			
@@ -239,6 +279,66 @@
 				}
 				return `<span class="${cls}">${match}</span>`;
 			});
+	}
+
+	// Inline Editing
+	let editingCell = $state<{ rowIndex: number | null, colName: string | null }>({ rowIndex: null, colName: null });
+	let inlineValue = $state("");
+
+	function enterCellEdit(rowIndex: number, colName: string, currentVal: any) {
+		if (primaryKeys.length === 0) return; // Prevent edit if no PK
+		editingCell = { rowIndex, colName };
+		inlineValue = currentVal === null ? "" : String(currentVal);
+		
+		// Auto-focus the input after Svelte renders it
+		tick().then(() => {
+			const input = document.getElementById(`inline-edit-${rowIndex}-${colName}`) as HTMLInputElement;
+			if (input) {
+				input.focus();
+				input.select();
+			}
+		});
+	}
+
+	async function handleInlineSave(row: any) {
+		const { rowIndex, colName } = editingCell;
+		if (rowIndex === null || colName === null) return;
+
+		const newValue = inlineValue;
+		const originalValue = row[colName];
+
+		// If value didn't change, just exit
+		if (String(newValue) === String(originalValue)) {
+			editingCell = { rowIndex: null, colName: null };
+			return;
+		}
+
+		processingAction = true;
+		try {
+			let pks: any = {};
+			primaryKeys.forEach(pk => pks[pk] = row[pk]);
+
+			const res = await axios.put(`http://127.0.0.1:8000/db/table/${tableName}/row`, {
+				primary_keys: pks,
+				payload: { [colName]: newValue }
+			});
+
+			if (res.data.success) {
+				// Local update to avoid full refresh
+				row[colName] = newValue;
+				editingCell = { rowIndex: null, colName: null };
+			} else {
+				alert("Update Failed: " + res.data.error);
+			}
+		} catch (err: any) {
+			alert("System Error: " + (err.response?.data?.error || err.message));
+		} finally {
+			processingAction = false;
+		}
+	}
+
+	function handleInlineCancel() {
+		editingCell = { rowIndex: null, colName: null };
 	}
 </script>
 
@@ -381,8 +481,27 @@
 									</td>
 									
 									<!-- Data Cells -->
-									{#each structure as col}
-										<td class="px-6 py-3 text-sm {col.is_primary ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-slate-600 dark:text-slate-300'} max-w-sm truncate">
+									{#each structure as col, colIndex}
+										<td 
+											class="px-6 py-3 text-sm {col.is_primary ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-slate-600 dark:text-slate-300'} max-w-sm truncate relative {primaryKeys.length > 0 ? 'cursor-pointer' : 'cursor-not-allowed text-opacity-50'}"
+											ondblclick={() => enterCellEdit(data.indexOf(row), col.name, row[col.name])}
+										>
+											{#if editingCell.rowIndex === data.indexOf(row) && editingCell.colName === col.name}
+												<div class="absolute inset-0 z-10 bg-white dark:bg-slate-900 border-2 border-emerald-500 rounded-lg shadow-xl shadow-emerald-500/20 px-2 py-1 flex items-center">
+													<input 
+														id={`inline-edit-${data.indexOf(row)}-${col.name}`}
+														type="text"
+														bind:value={inlineValue}
+														class="w-full bg-transparent outline-none font-mono text-sm dark:text-white"
+														onkeydown={(e) => {
+															if (e.key === 'Enter') handleInlineSave(row);
+															if (e.key === 'Escape') handleInlineCancel();
+														}}
+														onblur={() => handleInlineSave(row)}
+													/>
+												</div>
+											{/if}
+
 											{#if row[col.name] === null}
 												<span class="text-slate-400 dark:text-slate-600 italic font-mono text-[10px] uppercase tracking-widest opacity-50">NULL</span>
 											
