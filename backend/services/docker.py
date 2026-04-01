@@ -167,3 +167,140 @@ def deploy_container(image: str, name: str, ports: list, envs: list):
         return {"success": True, "id": result.stdout.strip()}
     except Exception as e:
         return {"error": str(e)}
+
+def get_container_details(container_id: str):
+    """Deep inspect of a container to get Env and NetworkSettings."""
+    try:
+        result = subprocess.run(
+            ["docker", "inspect", container_id],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            return None
+        data = json.loads(result.stdout.strip())
+        return data[0] if data else None
+    except:
+        return None
+
+def get_dependency_graph():
+    """Aggregate topological data from Docker and DB."""
+    from services.db import load_config, get_relations
+    
+    db_config = load_config()
+    db_host = db_config.get("db_host", "localhost")
+    db_name = db_config.get("db_name", "postgres")
+    
+    containers = get_containers()
+    if "error" in containers:
+        containers = []
+        
+    nodes_map = {}
+    edges = []
+    
+    # 1. Database Node
+    db_node_id = f"db_{db_name}"
+    nodes_map[db_node_id] = {
+        "id": db_node_id,
+        "type": "database",
+        "label": f"POSTGRES: {db_name.upper()}",
+        "metadata": db_config
+    }
+    
+    # 2. Extract Tables from relations
+    table_relations = get_relations()
+    table_names = set()
+    if isinstance(table_relations, list):
+        for r in table_relations:
+            table_names.add(r["source_table"])
+            table_names.add(r["target_table"])
+            edges.append({
+                "from": r["source_table"],
+                "to": r["target_table"],
+                "type": "foreign_key",
+                "label": f"{r['source_column']} → {r['target_column']}"
+            })
+            
+    for table in table_names:
+        nodes_map[table] = {
+            "id": table,
+            "type": "table",
+            "label": table.split('.')[-1].upper()
+        }
+        # Connect table to its database
+        edges.append({
+            "from": db_node_id, 
+            "to": table, 
+            "type": "contains"
+        })
+
+    # 3. Process Containers
+    for c in containers:
+        c_id = c["id"]
+        details = get_container_details(c_id)
+        if not details:
+            continue
+            
+        c_name = c["name"].lstrip('/')
+        nodes_map[c_id] = {
+            "id": c_id,
+            "type": "container",
+            "label": c_name.upper(),
+            "metadata": {
+                "image": c["image"],
+                "status": c["status"],
+                "project": c["project"],
+                "env": details.get("Config", {}).get("Env", []),
+                "networks": details.get("NetworkSettings", {}).get("Networks", {})
+            }
+        }
+        
+        # Ports
+        port_bindings = details.get("NetworkSettings", {}).get("Ports", {}) or {}
+        for container_port, host_bindings in port_bindings.items():
+            if host_bindings:
+                for binding in host_bindings:
+                    host_port = binding.get("HostPort")
+                    if not host_port:
+                        continue
+                    port_id = f"port_{host_port}"
+                    
+                    # Deduplicate port nodes (same host port might be bound to multiple IPs)
+                    if port_id not in nodes_map:
+                        nodes_map[port_id] = {
+                            "id": port_id,
+                            "type": "port",
+                            "label": f"PORT {host_port}",
+                            "metadata": {
+                                "host_port": host_port,
+                                "container_port": container_port,
+                                "protocol": container_port.split('/')[-1] if '/' in container_port else "tcp"
+                            }
+                        }
+                    edges.append({
+                        "from": c_id,
+                        "to": port_id,
+                        "type": "exposes",
+                        "label": "EXPOSE"
+                    })
+        
+        # DB Connections (Env parsing)
+        envs = details.get("Config", {}).get("Env", []) or []
+        is_connected = False
+        
+        for env in envs:
+            if '=' in env:
+                key, val = env.split('=', 1)
+                # Simple heuristic: if the env contains our current db_host
+                if val == db_host or db_host in val:
+                    is_connected = True
+                    break
+        
+        if is_connected:
+            edges.append({
+                "from": c_id,
+                "to": db_node_id,
+                "type": "connects_to",
+                "label": "SQL"
+            })
+            
+    return {"nodes": list(nodes_map.values()), "edges": edges}
