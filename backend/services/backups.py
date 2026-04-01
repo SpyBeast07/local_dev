@@ -100,6 +100,122 @@ def export_db(export_format: str = "sql"):
     return {"success": False, "error": f"Unsupported format: {export_format}"}
 
 
+def export_table(table_ref: str, export_format: str, columns: list = None):
+    """Exports a single table's data in the requested format with optional column filtering."""
+    try:
+        schema, table = _parse_table_ref(table_ref)
+
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                # Build column selection
+                if columns:
+                    col_sql = ", ".join([f'"{c}"' for c in columns])
+                else:
+                    col_sql = "*"
+                query = f'SELECT {col_sql} FROM "{schema}"."{table}"'
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                col_names = [desc[0] for desc in cursor.description]
+
+        df = pd.DataFrame(rows, columns=col_names)
+
+        # Strip timezones for Excel/openpyxl compatibility
+        for col_name in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col_name]):
+                try:
+                    df[col_name] = df[col_name].dt.tz_localize(None)
+                except Exception:
+                    pass
+
+        safe_name = table.replace(".", "_")
+
+        if export_format == "json":
+            return {
+                "success": True,
+                "data": df.to_json(orient="records", indent=2, default_handler=str),
+                "filename": f"{safe_name}.json",
+                "mime": "application/json"
+            }
+
+        elif export_format == "csv":
+            return {
+                "success": True,
+                "data": df.to_csv(index=False).encode("utf-8"),
+                "filename": f"{safe_name}.csv",
+                "mime": "text/csv"
+            }
+
+        elif export_format == "excel":
+            output = io.BytesIO()
+            writer = pd.ExcelWriter(output, engine="openpyxl")
+            df.to_excel(writer, sheet_name=safe_name[-31:], index=False)
+            writer.close()
+            return {
+                "success": True,
+                "data": output.getvalue(),
+                "filename": f"{safe_name}.xlsx",
+                "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
+
+        elif export_format == "dbml":
+            # Generate single-table DBML + data hybrid
+            structure = get_table_structure(table_ref)
+            lines = [f'// DevBeast Table Export: {table}', ""]
+            lines.append(f'Table "{table}" {{')
+            for col in structure.get("columns", []):
+                col_name = f'"{col["name"]}"'
+                col_type_str = f'"{col["type"]}"'
+                meta = []
+                if col["is_primary"]: meta.append("primary key")
+                if not col["nullable"]: meta.append("not null")
+                default_val = col["default"]
+                if default_val and "nextval" in default_val.lower():
+                    meta.append("increment")
+                elif default_val:
+                    meta.append(f"default: `{default_val}`")
+                col_line = f'  {col_name} {col_type_str}'
+                if meta:
+                    col_line += f" [{', '.join(meta)}]"
+                lines.append(col_line)
+            lines.append("}")
+            # Bundle data
+            if not df.empty:
+                lines.append("")
+                lines.append("/* DEVBEAST_DATA_START")
+                for _, row in df.iterrows():
+                    cols_str = ", ".join([f'"{c}"' for c in df.columns])
+                    vals = []
+                    for v in row:
+                        if isinstance(v, bool):
+                            vals.append("TRUE" if v else "FALSE")
+                        elif isinstance(v, (dict, list)):
+                            vals.append(f"'{json.dumps(v, default=str).replace(chr(39), chr(39)+chr(39))}'")
+                        elif isinstance(v, (int, float)):
+                            try:
+                                vals.append("NULL" if pd.isna(v) else str(v))
+                            except Exception:
+                                vals.append(str(v))
+                        else:
+                            try:
+                                is_null = pd.isna(v)
+                            except Exception:
+                                is_null = v is None
+                            vals.append("NULL" if is_null else f"'{str(v).replace(chr(39), chr(39)+chr(39))}'")
+                    lines.append(f'INSERT INTO "{schema}"."{table}" ({cols_str}) VALUES ({", ".join(vals)});')
+                lines.append("DEVBEAST_DATA_END */")
+            return {
+                "success": True,
+                "data": "\n".join(lines),
+                "filename": f"{safe_name}.dbml",
+                "mime": "text/plain"
+            }
+
+        return {"success": False, "error": f"Unsupported format: {export_format}"}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def generate_dbml(dbname: str, tables_data: dict = None):
     """Generates a DBML string representing the current schema, optionally bundling data."""
     tables = get_tables()

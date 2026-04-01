@@ -42,6 +42,79 @@
 	let rowToDelete = $state<any>(null);
 	let processingAction = $state(false);
 
+	// Export state
+	let showExportDropdown = $state(false);
+	let showColumnPicker = $state(false);
+	let selectedColumns = $state<Set<string>>(new Set());
+	let exportLoading = $state(false);
+	let columnsInitialized = $state(false);
+
+	// Only initialise selected columns ONCE when the structure first loads.
+	// Using a flag prevents the effect from re-populating after the user clicks "None".
+	$effect(() => {
+		if (structure.length > 0 && !columnsInitialized) {
+			selectedColumns = new Set(structure.map(c => c.name));
+			columnsInitialized = true;
+		}
+	});
+
+	function toggleColumn(name: string) {
+		const next = new Set(selectedColumns);
+		if (next.has(name)) { next.delete(name); } else { next.add(name); }
+		selectedColumns = next;
+	}
+
+	function selectAllColumns() { selectedColumns = new Set(structure.map(c => c.name)); }
+	// Clears to an empty Set — the $effect no longer fires because columnsInitialized is true
+	function clearAllColumns() { selectedColumns = new Set(); }
+
+	async function handleTableExport(format: string, cols: string[] | null = null) {
+		exportLoading = true;
+		showExportDropdown = false;
+		showColumnPicker = false;
+		try {
+			let url = `http://127.0.0.1:8000/db/table/${tableName}/export?format=${format}`;
+			if (cols && cols.length > 0) url += `&columns=${encodeURIComponent(cols.join(','))}`;
+
+			const res = await axios.get(url, { responseType: 'blob' });
+
+			const extensions: Record<string, string> = { json: '.json', csv: '.csv', excel: '.xlsx', dbml: '.dbml' };
+			const ext = extensions[format] || '.json';
+			const raw = tableName.split('.').pop() || tableName;
+			const defaultName = `${raw}${ext}`;
+
+			// Try Content-Disposition
+			let finalName = defaultName;
+			const cd = res.headers['content-disposition'];
+			if (cd?.includes('filename=')) finalName = cd.split('filename=')[1].split(';')[0];
+
+			if ('showSaveFilePicker' in window) {
+				try {
+					const handle = await (window as any).showSaveFilePicker({ suggestedName: finalName });
+					finalName = handle.name;
+					const writable = await handle.createWritable();
+					await writable.write(res.data);
+					await writable.close();
+				} catch (e: any) {
+					if (e.name === 'AbortError') return;
+					const a = document.createElement('a');
+					a.href = URL.createObjectURL(res.data);
+					a.download = finalName;
+					a.click();
+				}
+			} else {
+				const a = document.createElement('a');
+				a.href = URL.createObjectURL(res.data);
+				a.download = finalName;
+				a.click();
+			}
+		} catch (err) {
+			console.error('Export failed:', err);
+		} finally {
+			exportLoading = false;
+		}
+	}
+
 	async function fetchStructure() {
 		try {
 			const res = await axios.get(`http://127.0.0.1:8000/db/table/${tableName}/structure`);
@@ -426,27 +499,63 @@
 			<div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200/60 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 relative w-full max-w-full">
 				
 				<!-- Header Actions & Paginator top -->
-				<div class="px-6 py-4 bg-slate-50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+				<div class="px-6 py-4 bg-slate-50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3 flex-wrap">
+					<!-- Insert Row -->
 					<button onclick={openInsertModal} class="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-200 dark:border-emerald-800/40 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm">
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
 						Insert Row
 					</button>
 
-					<button
-						onclick={fetchData}
-						disabled={loading}
-						title="Refresh table data"
-						class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-400/30 text-slate-500 dark:text-slate-400 text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-sm"
-					>
+					<!-- Refresh -->
+					<button onclick={fetchData} disabled={loading} title="Refresh table data" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-400/30 text-slate-500 dark:text-slate-400 text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-sm">
 						<svg class="w-4 h-4 {loading ? 'animate-spin' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
 						</svg>
 						{loading ? 'Refreshing...' : 'Refresh'}
 					</button>
 
-					<div class="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
-						<span>Rows {offset + 1}-{Math.min(offset + pageSize, totalRows)} of {totalRows}</span>
-						
+					<!-- Export Dropdown -->
+					<div class="relative">
+						<button
+							onclick={() => (showExportDropdown = !showExportDropdown)}
+							disabled={exportLoading}
+							class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-500 hover:text-white text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800/40 text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+						>
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+							{exportLoading ? 'Exporting...' : 'Export ▾'}
+						</button>
+
+						{#if showExportDropdown}
+							<div class="absolute left-0 top-full mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 py-2 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+								<!-- Export All section -->
+								<div class="px-4 py-1.5">
+									<p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Export All Columns</p>
+								</div>
+								{#each [['JSON', 'json'], ['CSV', 'csv'], ['Excel', 'excel'], ['DBML', 'dbml']] as [label, fmt]}
+									<button onclick={() => handleTableExport(fmt)} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-violet-500 hover:text-white transition-colors flex items-center gap-2">
+										<span class="w-1.5 h-1.5 rounded-full bg-violet-400"></span>{label}
+									</button>
+								{/each}
+								<!-- Divider -->
+								<div class="border-t border-slate-100 dark:border-slate-800 my-1.5"></div>
+								<!-- Export Selected -->
+								<div class="px-4 py-1.5">
+									<p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Selected Columns</p>
+								</div>
+								<button
+									onclick={() => { showColumnPicker = true; showExportDropdown = false; }}
+									class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:bg-violet-500 hover:text-white transition-colors flex items-center gap-2"
+								>
+									<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+									Choose Columns...
+								</button>
+							</div>
+						{/if}
+					</div>
+
+					<!-- Row counter + pagination pushed to the end -->
+					<div class="ml-auto flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+						<span>Rows {offset + 1}–{Math.min(offset + pageSize, totalRows)} of {totalRows}</span>
 						<div class="flex items-center gap-1">
 							<button onclick={prevPage} disabled={currentPage === 1} aria-label="Previous Page" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-30 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" /></svg></button>
 							<span class="px-3">Pg {currentPage}</span>
@@ -454,6 +563,7 @@
 						</div>
 					</div>
 				</div>
+
 
 
 				<div class="overflow-x-auto custom-scrollbar">
@@ -708,6 +818,82 @@
 				{/if}
 			</button>
 		</div>
+	</div>
+</div>
+{/if}
+
+<!-- COLUMN PICKER EXPORT MODAL -->
+{#if showColumnPicker}
+<div
+	class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm"
+	role="presentation"
+	onclick={() => (showColumnPicker = false)}
+	onkeydown={(e) => { if (e.key === 'Escape') showColumnPicker = false; }}
+>
+	<div
+		class="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-3xl p-8 max-w-md w-full flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-200"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Export Column Picker"
+		tabindex="-1"
+		onclick={(e) => e.stopPropagation()}
+		onkeydown={(e) => e.stopPropagation()}
+	>
+		<!-- Header -->
+		<div class="flex items-center justify-between">
+			<div>
+				<h3 class="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">Select Columns</h3>
+				<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Choose which columns to export</p>
+			</div>
+			<div class="flex gap-2">
+				<button onclick={selectAllColumns} class="text-[9px] font-black px-2 py-1 rounded-lg bg-violet-500/10 text-violet-500 hover:bg-violet-500 hover:text-white transition-all uppercase tracking-widest border border-violet-500/20">All</button>
+				<button onclick={clearAllColumns} class="text-[9px] font-black px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-rose-500 hover:text-white transition-all uppercase tracking-widest border border-slate-200 dark:border-slate-700">None</button>
+			</div>
+		</div>
+
+		<!-- Column Checkboxes -->
+		<div class="flex flex-col gap-1 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+			{#each structure as col}
+				<label class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer transition-colors group">
+					<input
+						type="checkbox"
+						checked={selectedColumns.has(col.name)}
+						onchange={() => toggleColumn(col.name)}
+						class="w-4 h-4 rounded accent-violet-500 cursor-pointer"
+					/>
+					<div class="flex items-center gap-2 min-w-0">
+						{#if col.is_primary}
+							<span class="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 uppercase tracking-widest shrink-0">PK</span>
+						{/if}
+						<span class="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{col.name}</span>
+						<span class="text-[9px] font-mono text-slate-400 uppercase shrink-0">{col.type}</span>
+					</div>
+				</label>
+			{/each}
+		</div>
+
+		<!-- Selected count -->
+		<p class="text-[10px] font-black text-slate-400 uppercase tracking-widest -mt-2">
+			{selectedColumns.size} of {structure.length} columns selected
+		</p>
+
+		<!-- Format Buttons -->
+		<div class="flex flex-col gap-2">
+			<p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Export as</p>
+			<div class="grid grid-cols-2 gap-2">
+				{#each [['JSON', 'json', 'bg-amber-500'], ['CSV', 'csv', 'bg-emerald-500'], ['Excel', 'excel', 'bg-green-600'], ['DBML', 'dbml', 'bg-violet-500']] as [label, fmt, color]}
+					<button
+						onclick={() => handleTableExport(fmt, Array.from(selectedColumns))}
+						disabled={selectedColumns.size === 0 || exportLoading}
+						class="{color} hover:opacity-90 active:scale-95 text-white px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-40 disabled:shadow-none"
+					>
+						{label}
+					</button>
+				{/each}
+			</div>
+		</div>
+
+		<button onclick={() => (showColumnPicker = false)} class="text-[10px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 uppercase tracking-widest transition-colors text-center">Cancel</button>
 	</div>
 </div>
 {/if}

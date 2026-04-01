@@ -12,7 +12,7 @@ from services.docker import (
 )
 from services.ports import get_ports, kill_port_process
 from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config
-from services.backups import export_db, restore_db
+from services.backups import export_db, restore_db, export_table
 
 load_dotenv()
 
@@ -146,6 +146,25 @@ async def delete_table_row(table_name: str, request: Request):
 @app.get("/db/relations")
 def relations():
     return get_relations()
+
+@app.get("/db/table/{table_name}/export")
+def export_table_data(table_name: str, format: str = "json", columns: str = None):
+    """Export a single table in the specified format.
+    - format: json | csv | excel | dbml
+    - columns: optional comma-separated list of column names to include
+    """
+    col_list = [c.strip() for c in columns.split(",") if c.strip()] if columns else None
+    result = export_table(table_name, format, col_list)
+    if not result["success"]:
+        return JSONResponse(status_code=500, content=result)
+    data = result["data"]
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type=result["mime"],
+        headers={"Content-Disposition": f"attachment; filename={result['filename']}"}
+    )
 
 class QueryPayload(BaseModel):
     query: str
