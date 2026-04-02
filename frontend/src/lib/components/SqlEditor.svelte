@@ -36,6 +36,9 @@
 
 		let options: any[] = [];
 
+		// Helper to strip schema
+		const getShortName = (name: string) => name.includes('.') ? name.split('.').pop()! : name;
+
 		// Case 1: After a dot (e.g., "u." or "users.")
 		if (queryContext.afterDot) {
 			const target = queryContext.afterDot.toLowerCase();
@@ -48,7 +51,7 @@
 				options = schema[tableName].map((col) => ({
 					label: col,
 					type: 'property',
-					detail: `col from ${tableName}`,
+					detail: `📄 col from ${getShortName(tableName)}`,
 					boost: 100, // Priority: Columns
 					info: `📄 Column: ${col}`
 				}));
@@ -56,25 +59,31 @@
 		}
 		// Case 2: After FROM or JOIN (Suggest Tables)
 		else if (queryContext.nearestKeyword === 'FROM' || queryContext.nearestKeyword === 'JOIN') {
-			options = Object.keys(schema).map((table) => ({
-				label: table,
-				type: 'class',
-				detail: 'table',
-				boost: 90, // Priority: Tables
-				info: `🗄️ Table: ${table}`
-			}));
+			options = Object.keys(schema).map((table) => {
+				const shortName = getShortName(table);
+				return {
+					label: shortName,
+					type: 'class',
+					detail: '🗄️ table',
+					boost: 90, // Priority: Tables
+					info: `🗄️ Table: ${table}`
+				};
+			});
 		}
 		// Case 3: Default Suggestions (Keywords + Tables + Columns from identified tables)
 		else {
 			// Add all tables
 			options.push(
-				...Object.keys(schema).map((table) => ({
-					label: table,
-					type: 'class',
-					detail: 'table',
-					boost: 50,
-					info: `🗄️ Table: ${table}`
-				}))
+				...Object.keys(schema).map((table) => {
+					const shortName = getShortName(table);
+					return {
+						label: shortName,
+						type: 'class',
+						detail: '🗄️ table',
+						boost: 50,
+						info: `🗄️ Table: ${table}`
+					};
+				})
 			);
 
 			// Add columns from tables already in the query (if any)
@@ -85,7 +94,7 @@
 						...schema[table].map((col) => ({
 							label: col,
 							type: 'property',
-							detail: `col from ${table}`,
+							detail: `📄 col from ${getShortName(table)}`,
 							boost: 60,
 							info: `📄 Column: ${col}`
 						}))
