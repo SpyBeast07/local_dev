@@ -1,24 +1,26 @@
-from fastapi import FastAPI, Request, UploadFile, File, Query
+from fastapi import FastAPI, Request, UploadFile, File, Query, Form
 from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 import json
 import io
 from pydantic import BaseModel
+from typing import Optional, Annotated
 from services.docker import (
     get_containers, get_container_logs, manage_container, get_container_stats,
     get_images, pull_image, delete_image, get_volumes, get_networks, deploy_container,
     get_dependency_graph, get_impact_analysis, trace_query
 )
 from services.ports import get_ports, kill_port_process
-from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config
+from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config, truncate_tables
 from services.backups import export_db, restore_db, export_table
+from services.seeding import run_seed_script
 
 load_dotenv()
 
 app = FastAPI()
 
-from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,7 +28,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 @app.get("/")
@@ -196,8 +197,45 @@ async def post_db_restore(file: UploadFile = File(...), clean: bool = Query(Fals
     # Let the service handle format detection via filename
     return restore_db(content, file.filename, clean_schema=clean)
 
-
-
+@app.post("/db/reset-reseed")
+async def reset_reseed(
+    mode: str = Form(...),
+    backup: bool = Form(True),
+    should_seed: bool = Form(True),
+    seed_file: Optional[UploadFile] = File(None)
+):
+    """Unified action to reset and reseed the database."""
+    results = {}
+    
+    # 1. Backup if requested
+    if backup:
+        backup_res = export_db("sql")
+        results["backup"] = backup_res
+        if not backup_res["success"]:
+            return JSONResponse(status_code=500, content={"success": False, "error": f"Auto-backup failed: {backup_res['error']}"})
+    
+    # 2. Reset
+    if mode == "full":
+        reset_res = restore_db(b"", "empty_reset.sql", clean_schema=True)
+        results["reset"] = reset_res
+    elif mode == "data-only":
+        reset_res = truncate_tables()
+        results["reset"] = reset_res
+    else:
+        return JSONResponse(status_code=400, content={"success": False, "error": "Invalid reset mode."})
+    
+    if not reset_res["success"]:
+        return JSONResponse(status_code=500, content={"success": False, "error": f"Reset failed: {reset_res['error']}"})
+        
+    # 3. Reseed (Optional)
+    if should_seed:
+        sql_content = await seed_file.read() if seed_file else None
+        seed_res = run_seed_script(sql_content)
+        results["seed"] = seed_res
+    else:
+        results["seed"] = {"success": True, "message": "Seeding skipped by user."}
+        
+    return {"success": True, "details": results}
 
 @app.get("/config/db")
 def get_db_config():
@@ -218,14 +256,3 @@ async def update_db_config(request: Request):
             status_code=400,
             content={"success": False, "error": str(e)}
         )
-
-
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)

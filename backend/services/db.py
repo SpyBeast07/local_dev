@@ -185,6 +185,30 @@ def get_table_data(table_name: str, limit: int = 20, offset: int = 0, sort_col: 
     except Exception as e:
         return {"error": str(e)}
 
+def truncate_tables():
+    """Truncates all user tables in the public schema and restarts identities."""
+    try:
+        tables = get_tables()
+        if isinstance(tables, dict) and "error" in tables:
+            return tables
+            
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                # 1. Truncate all tables in a single command for efficiency
+                # Restart identities for clean testing state
+                # Use CASCADE to handle FK constraints
+                table_list = ", ".join([f'"{_parse_table_ref(t)[0]}"."{_parse_table_ref(t)[1]}"' for t in tables])
+                if not table_list:
+                    return {"success": True, "message": "No tables detected for truncation."}
+                
+                query = f"TRUNCATE TABLE {table_list} RESTART IDENTITY CASCADE;"
+                cursor.execute(query)
+                conn.commit()
+                
+        return {"success": True, "message": f"Truncated {len(tables)} tables successfully."}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 def insert_row(table_name: str, payload: dict):
     if not payload:
         return {"success": False, "error": "Empty payload injected."}

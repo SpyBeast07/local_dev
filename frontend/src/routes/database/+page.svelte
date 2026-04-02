@@ -18,6 +18,13 @@
 	let restoreFile = $state<File | null>(null);
 	let restoreClean = $state(false);
 	let showExportDropdown = $state(false);
+	let showResetReseedModal = $state(false);
+	let resetReseedLoading = $state(false);
+	let resetReseedMode = $state<'full' | 'data-only'>('data-only');
+	let shouldSeed = $state(true);
+	let seedFile = $state<File | null>(null);
+	let backupBeforeReset = $state(true);
+	let resetConfirmType = $state('');
 
 	let dbName = $state('postgres');
 	let typedConfirmation = $state('');
@@ -34,7 +41,6 @@
 	onMount(() => {
 		fetchDbConfig();
 	});
-
 
 	function triggerQuery() {
 		if (!query.trim()) return;
@@ -151,9 +157,6 @@
 		}
 	}
 
-
-
-
 	async function handleRestore() {
 		if (!restoreFile) return;
 		restoreLoading = true;
@@ -179,6 +182,39 @@
 			restoreLoading = false;
 			restoreFile = null;
 			restoreClean = false; // Reset for next time
+		}
+	}
+
+	async function handleResetReseed() {
+		if (resetConfirmType.toUpperCase() !== 'RESET') return;
+		resetReseedLoading = true;
+		try {
+			const formData = new FormData();
+			formData.append('mode', resetReseedMode);
+			formData.append('should_seed', shouldSeed.toString());
+			formData.append('backup', backupBeforeReset.toString());
+			if (seedFile) {
+				formData.append('seed_file', seedFile);
+			}
+
+			const res = await axios.post('http://127.0.0.1:8000/db/reset-reseed', formData);
+			if (res.data.success) {
+				queryResult = {
+					success: true,
+					affected_rows: `CLEAN SLATE: ${resetReseedMode.toUpperCase()} + RESEED SUCCESSFUL`
+				};
+				const tableRes = await axios.get('http://127.0.0.1:8000/db/tables');
+				tables = Array.isArray(tableRes.data) ? tableRes.data : [];
+				showResetReseedModal = false;
+				seedFile = null;
+			} else {
+				queryResult = { success: false, error: res.data.error };
+			}
+		} catch (err: any) {
+			queryResult = { success: false, error: err.message };
+		} finally {
+			resetReseedLoading = false;
+			resetConfirmType = '';
 		}
 	}
 
@@ -231,7 +267,6 @@
 	}
 </script>
 
-
 <div class="flex flex-col gap-10 pb-20">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-center gap-4">
@@ -264,7 +299,6 @@
 	<div
 		class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-6 relative w-full max-w-full"
 	>
-
 		<div class="flex items-center justify-between">
 			<h2
 				class="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest italic flex items-center gap-2"
@@ -342,12 +376,31 @@
 										class="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-1.5 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
 										use:clickOutside={() => (showExportDropdown = false)}
 									>
-
-										<button onclick={() => handleBackup('sql')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">SQL</button>
-										<button onclick={() => handleBackup('json')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">JSON</button>
-										<button onclick={() => handleBackup('dbml')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">DBML</button>
-										<button onclick={() => handleBackup('csv')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">CSV (Zip)</button>
-										<button onclick={() => handleBackup('excel')} class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors">Excel</button>
+										<button
+											onclick={() => handleBackup('sql')}
+											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+											>SQL</button
+										>
+										<button
+											onclick={() => handleBackup('json')}
+											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+											>JSON</button
+										>
+										<button
+											onclick={() => handleBackup('dbml')}
+											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+											>DBML</button
+										>
+										<button
+											onclick={() => handleBackup('csv')}
+											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+											>CSV (Zip)</button
+										>
+										<button
+											onclick={() => handleBackup('excel')}
+											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+											>Excel</button
+										>
 									</div>
 								{/if}
 							</div>
@@ -365,8 +418,14 @@
 										if (restoreFile) showRestoreModal = true;
 									}}
 								/>
-
 							</label>
+
+							<button
+								onclick={() => (showResetReseedModal = true)}
+								class="bg-rose-500/10 hover:bg-rose-500 text-rose-600 dark:text-rose-400 hover:text-white px-3 py-1.5 rounded-lg border border-rose-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5"
+							>
+								Reset & Reseed
+							</button>
 						</div>
 					</div>
 				</div>
@@ -706,7 +765,9 @@
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rose-950/90 backdrop-blur-md"
 		role="presentation"
-		onkeydown={(e) => { if (e.key === 'Escape') showRootModal = false; }}
+		onkeydown={(e) => {
+			if (e.key === 'Escape') showRootModal = false;
+		}}
 	>
 		<div
 			class="bg-rose-950 border-2 border-rose-500 shadow-2xl shadow-rose-900/50 rounded-3xl p-8 max-w-sm w-full flex flex-col gap-6 animate-in zoom-in-95 duration-200"
@@ -740,10 +801,14 @@
 					placeholder={dbName}
 					onpaste={(e) => e.preventDefault()}
 					oncopy={(e) => e.preventDefault()}
-					class="w-full px-4 py-3 rounded-xl bg-black/20 border-2 {typedConfirmation === dbName ? 'border-emerald-500/50' : 'border-rose-500/30'} text-white text-center font-bold uppercase tracking-widest text-sm focus:outline-none focus:border-rose-500/60 transition-all placeholder:opacity-20"
+					class="w-full px-4 py-3 rounded-xl bg-black/20 border-2 {typedConfirmation === dbName
+						? 'border-emerald-500/50'
+						: 'border-rose-500/30'} text-white text-center font-bold uppercase tracking-widest text-sm focus:outline-none focus:border-rose-500/60 transition-all placeholder:opacity-20"
 				/>
 				{#if typedConfirmation && typedConfirmation !== dbName}
-					<p class="text-[9px] font-black text-rose-500 uppercase tracking-[0.2em] text-center animate-pulse">
+					<p
+						class="text-[9px] font-black text-rose-500 uppercase tracking-[0.2em] text-center animate-pulse"
+					>
 						Verification Mismatch
 					</p>
 				{/if}
@@ -758,7 +823,9 @@
 				<button
 					onclick={confirmRoot}
 					disabled={typedConfirmation !== dbName}
-					class="flex-1 px-4 py-4 rounded-xl {typedConfirmation === dbName ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/40' : 'bg-rose-600 opacity-50 cursor-not-allowed'} text-white font-black uppercase tracking-widest text-xs transition-all shadow-lg"
+					class="flex-1 px-4 py-4 rounded-xl {typedConfirmation === dbName
+						? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/40'
+						: 'bg-rose-600 opacity-50 cursor-not-allowed'} text-white font-black uppercase tracking-widest text-xs transition-all shadow-lg"
 					>Proceed</button
 				>
 			</div>
@@ -790,7 +857,9 @@
 					<p class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] leading-relaxed">
 						Ready to inject <span class="text-blue-500 italic">{restoreFile?.name}</span>
 					</p>
-					<span class="px-2 py-0.5 bg-blue-500 text-white rounded text-[9px] font-black uppercase tracking-[0.2em]">
+					<span
+						class="px-2 py-0.5 bg-blue-500 text-white rounded text-[9px] font-black uppercase tracking-[0.2em]"
+					>
 						Detected: {restoreFile?.name.split('.').pop()?.toUpperCase() || 'SQL'}
 					</span>
 				</div>
@@ -846,6 +915,237 @@
 					class="flex-1 px-6 py-4 rounded-2xl bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20 active:scale-95"
 				>
 					Start Restore
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- RESET & RESEED MODAL -->
+{#if showResetReseedModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md"
+		transition:fade={{ duration: 200 }}
+	>
+		<div
+			class="bg-white dark:bg-slate-950 border border-rose-500/30 shadow-2xl rounded-[2.5rem] p-10 max-w-xl w-full flex flex-col gap-8 animate-in zoom-in-95 duration-300"
+		>
+			<div class="flex flex-col gap-2">
+				<div class="flex items-center justify-between">
+					<h3
+						class="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic"
+					>
+						Reset & Reseed <span class="text-rose-500">Flow</span>
+					</h3>
+					<div
+						class="px-3 py-1 bg-rose-500/10 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest border border-rose-500/20"
+					>
+						Safety Protocol
+					</div>
+				</div>
+				<p class="text-xs font-bold text-slate-500 uppercase tracking-widest">
+					Return to a clean, reproducible database state instantly.
+				</p>
+			</div>
+
+			<div class="grid grid-cols-2 gap-6">
+				<!-- RESET MODE -->
+				<div class="flex flex-col gap-4">
+					<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]"
+						>1. Reset Mode</span
+					>
+					<div class="flex flex-col gap-2">
+						<button
+							onclick={() => (resetReseedMode = 'data-only')}
+							class="flex flex-col p-4 rounded-2xl border-2 transition-all text-left {resetReseedMode ===
+							'data-only'
+								? 'border-emerald-500 bg-emerald-500/5'
+								: 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700'}"
+						>
+							<span
+								class="text-[11px] font-black uppercase tracking-widest {resetReseedMode ===
+								'data-only'
+									? 'text-emerald-500'
+									: 'text-slate-700 dark:text-slate-300'}">Data Only</span
+							>
+							<span class="text-[9px] font-bold text-slate-400 mt-1 uppercase"
+								>Truncate tables + Reset PKs</span
+							>
+						</button>
+						<button
+							onclick={() => (resetReseedMode = 'full')}
+							class="flex flex-col p-4 rounded-2xl border-2 transition-all text-left {resetReseedMode ===
+							'full'
+								? 'border-rose-500 bg-rose-500/5'
+								: 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700'}"
+						>
+							<span
+								class="text-[11px] font-black uppercase tracking-widest {resetReseedMode === 'full'
+									? 'text-rose-500'
+									: 'text-slate-700 dark:text-slate-300'}">Full Reset</span
+							>
+							<span class="text-[9px] font-bold text-slate-400 mt-1 uppercase"
+								>Drop & Recreate Public Schema</span
+							>
+						</button>
+					</div>
+				</div>
+
+				<!-- SEEDING CONFIGURATION -->
+				<div class="flex flex-col gap-4">
+					<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]"
+						>2. Seeding Configuration</span
+					>
+					<div class="flex flex-col gap-2">
+						<!-- SEED SCRIPT OPTION -->
+						<div
+							class="flex flex-col p-4 rounded-2xl border-2 transition-all {shouldSeed
+								? 'border-emerald-500 bg-emerald-500/5'
+								: 'border-slate-100 dark:border-slate-800 bg-transparent opacity-60 hover:opacity-100'}"
+						>
+							<div class="flex justify-between items-start">
+								<button
+									onclick={() => (shouldSeed = true)}
+									class="flex flex-col text-left flex-grow cursor-pointer"
+								>
+									<span
+										class="text-[11px] font-black uppercase tracking-widest {shouldSeed
+											? 'text-emerald-500'
+											: 'text-slate-700 dark:text-slate-300'}">Seed Script</span
+									>
+									<span class="text-[9px] font-bold text-slate-400 mt-1 uppercase"
+										>Run SQL bootstrap script</span
+									>
+								</button>
+								{#if shouldSeed}
+									<label
+										class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded text-[8px] font-black uppercase cursor-pointer transition-all animate-in zoom-in-95"
+									>
+										{seedFile ? 'Change File' : 'Select SQL'}
+										<input
+											type="file"
+											accept=".sql"
+											class="hidden"
+											onchange={(e) => (seedFile = e.currentTarget.files?.[0] || null)}
+										/>
+									</label>
+								{/if}
+							</div>
+
+							{#if shouldSeed}
+								<div class="flex flex-col gap-2 mt-3 animate-in fade-in slide-in-from-top-1">
+									<div class="flex items-center gap-2">
+										<div class="w-1 h-1 rounded-full bg-emerald-500"></div>
+										<span class="text-[9px] font-bold text-slate-500"
+											>Default: <code class="text-emerald-600 dark:text-emerald-400"
+												>scripts/seed.sql</code
+											></span
+										>
+									</div>
+									{#if seedFile}
+										<div
+											class="flex items-center gap-2 px-2 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg"
+										>
+											<span class="text-[9px] font-black text-emerald-600 truncate flex-grow"
+												>📄 {seedFile.name}</span
+											>
+											<button
+												onclick={() => (seedFile = null)}
+												class="text-emerald-500 hover:text-emerald-700 font-bold text-xs"
+												>×</button
+											>
+										</div>
+									{/if}
+								</div>
+							{/if}
+						</div>
+
+						<!-- NO SEED OPTION -->
+						<button
+							onclick={() => (shouldSeed = false)}
+							class="flex flex-col p-4 rounded-2xl border-2 transition-all text-left {!shouldSeed
+								? 'border-slate-400 bg-slate-400/5'
+								: 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700'}"
+						>
+							<span
+								class="text-[11px] font-black uppercase tracking-widest {!shouldSeed
+									? 'text-slate-500'
+									: 'text-slate-700 dark:text-slate-300'}">No Seed</span
+							>
+							<span class="text-[9px] font-bold text-slate-400 mt-1 uppercase"
+								>Leave database empty after reset</span
+							>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<div
+				class="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col gap-6"
+			>
+				<label class="flex items-center gap-4 cursor-pointer group">
+					<input
+						type="checkbox"
+						bind:checked={backupBeforeReset}
+						class="w-6 h-6 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-transparent text-emerald-500 focus:ring-emerald-500 transition-all cursor-pointer"
+					/>
+					<div class="flex flex-col">
+						<span
+							class="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-widest group-hover:text-emerald-500 transition-colors"
+							>Safety Snapshot</span
+						>
+						<span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 leading-tight"
+							>Create a full SQL backup before starting the reset.</span
+						>
+					</div>
+				</label>
+
+				<div class="flex flex-col gap-3 pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
+					<div class="flex items-center justify-between">
+						<span class="text-[10px] font-black text-rose-500 uppercase tracking-widest select-none"
+							>Strong Confirmation</span
+						>
+						<span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest select-none"
+							>Type <span class="text-rose-500 select-none font-black">RESET</span> to confirm</span
+						>
+					</div>
+					<input
+						type="text"
+						bind:value={resetConfirmType}
+						placeholder="RESET"
+						onpaste={(e) => e.preventDefault()}
+						oncopy={(e) => e.preventDefault()}
+						onmousedown={(e) => e.detail > 1 && e.preventDefault()}
+						class="w-full bg-white dark:bg-black p-4 rounded-2xl border-2 {resetConfirmType.toUpperCase() ===
+						'RESET'
+							? 'border-emerald-500'
+							: 'border-rose-500/20'} text-center font-black uppercase tracking-[0.3em] text-sm focus:outline-none transition-all"
+					/>
+				</div>
+			</div>
+
+			<div class="flex gap-4">
+				<button
+					onclick={() => (showResetReseedModal = false)}
+					class="flex-1 px-8 py-5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-black uppercase tracking-widest text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-sm"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={handleResetReseed}
+					disabled={resetConfirmType.toUpperCase() !== 'RESET' || resetReseedLoading}
+					class="flex-[2] px-8 py-5 rounded-2xl {resetConfirmType.toUpperCase() === 'RESET'
+						? 'bg-emerald-600 hover:bg-emerald-500 shadow-xl shadow-emerald-500/30'
+						: 'bg-slate-200 dark:bg-slate-800 opacity-50 cursor-not-allowed'} text-white font-black uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3"
+				>
+					{#if resetReseedLoading}
+						<div
+							class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+						></div>
+						Processing Flow...
+					{:else}
+						Initialize Reset Flow
+					{/if}
 				</button>
 			</div>
 		</div>
