@@ -27,13 +27,27 @@ DevBeast builds a live map of your stack. Visualize the relationships between:
 - **Database ↔ Port Mappings**
 - **Table ↔ Table Foreign Keys**
 
+### ⌨️ Schema-Aware SQL Autocomplete
+A professional-grade, high-performance SQL editor integrated into the core dashboard.
+- **Context-Aware Suggestions**: Ranks completions based on cursor position (e.g., Tables after `FROM`, Columns after `u.`).
+- **Alias Resolution**: Dynamically parses queries to resolve table aliases (`SELECT u.name FROM users u`) and multi-table JOINs.
+- **Live Metadata Caching**: Sub-50ms autocomplete powered by an in-memory schema store and backend metadata synchronization.
+- **Rich Visuals**: Syntax highlighting, fuzzy matching, and distinct icons for tables (🗄️), columns (📄), and keywords (⚡).
+
 ### 💥 Impact Analysis (Blast Radius)
 Before you `COMMIT`, DevBeast computes the structural fallout of your changes.
 - **Dependency Detection**: Identify which tables, containers, and services are downstream of your query.
 - **Severity Scoring**: Automatically classifies impact as **LOW**, **MEDIUM**, or **HIGH** based on infrastructure risk.
 
 ### 🔍 Query Trace Flow
-Execute SQL and watch DevBeast visually highlight the "Blast Radius" in real-time on your dependency graph.
+Execute SQL and watch DevBeast visually highlight the "Blast Radius" in real-time. Seamlessly jump from the raw SQL editor to the graph view with pre-synchronized impact data.
+
+### 🎯 Interactive Plotting & Filtering
+The dependency mesh is now fully interactive with advanced filtering controls:
+- **Legend Toggles**: Instantly hide/show categories (Containers, Ports, Databases, Tables).
+- **Isolation Mode**: Double-click any category to solo its visibility and simplify complex meshes.
+- **Quick View Presets**: One-click toggles for "Infra View" (Compute/Network) and "Data View" (Relational/Storage).
+- **Visual Persistence**: Legend states are automatically saved to `localStorage` for a consistent workspace.
 
 ---
 
@@ -58,7 +72,7 @@ DevBeast provides high-fidelity, container-native database portability.
 ---
 
 ## 🛠️ Tech Stack
-- **Frontend**: SvelteKit (Svelte 5 Runes) + Tailwind CSS v4 + Vite + vis-network
+- **Frontend**: SvelteKit (Svelte 5 Runes) + Tailwind CSS v4 + CodeMirror 6 + vis-network
 - **Backend**: Python + FastAPI + Uvicorn + Psycopg2 + Subprocess Engine
 
 ---
@@ -95,7 +109,7 @@ uvicorn main:app --reload
 ### 2. Start the Frontend Application
 ```bash
 cd frontend
-npm install
+npm install  # Resolves CodeMirror 6 and visualization dependencies
 npm run dev
 ```
 *Note: Available at `http://localhost:5173`.*
