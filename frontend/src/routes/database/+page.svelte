@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import axios from 'axios';
 	import { fade } from 'svelte/transition';
+	import { schemaStore } from '$lib/stores/schemaStore';
+	import SqlEditor from '$lib/components/SqlEditor.svelte';
 
 	let tables = $state<string[]>([]);
 	let loading = $state(true);
@@ -40,6 +42,7 @@
 
 	onMount(() => {
 		fetchDbConfig();
+		schemaStore.fetchSchema();
 	});
 
 	function triggerQuery() {
@@ -318,18 +321,12 @@
 		</div>
 
 		<div class="flex flex-col gap-4">
-			<textarea
-				bind:value={query}
-				placeholder="SELECT * FROM users;"
-				rows="4"
-				class="bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 font-mono text-sm tracking-wider text-slate-700 dark:text-slate-300 placeholder:text-slate-400/50 focus:outline-none focus:border-emerald-500 transition-colors custom-scrollbar resize-y italic"
-				onkeydown={(e) => {
-					if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-						e.preventDefault();
-						triggerQuery();
-					}
-				}}
-			></textarea>
+			<SqlEditor 
+				bind:value={query} 
+				placeholder="SELECT * FROM public.users;" 
+				onRun={triggerQuery} 
+			/>
+		</div>
 
 			<!-- Schema naming hint & Portability tools -->
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -487,7 +484,7 @@
 										>⚡ Query Trace Summary</span
 									>
 									<a
-										href="/relations"
+										href="/relations?query={encodeURIComponent(query)}"
 										class="text-[9px] font-black px-2 py-0.5 bg-indigo-500/10 text-indigo-500 rounded border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all uppercase tracking-widest"
 										>Jump to Graph</a
 									>
@@ -719,7 +716,6 @@
 			{/each}
 		</div>
 	{/if}
-</div>
 
 <!-- FIRST CONFIRMATION MODAL -->
 {#if showConfirmModal}

@@ -63,6 +63,34 @@ def _parse_table_ref(table_ref: str):
         return schema, table
     return 'public', table_ref
 
+def get_full_schema():
+    """Fetches all tables and their columns in a single dictionary for autocomplete caching."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT table_schema, table_name, column_name
+            FROM information_schema.columns
+            WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+            ORDER BY table_schema, table_name, ordinal_position;
+        """)
+        
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        schema_map = {}
+        for schema, table, column in rows:
+            full_table = f"{schema}.{table}"
+            if full_table not in schema_map:
+                schema_map[full_table] = []
+            schema_map[full_table].append(column)
+            
+        return {"success": True, "schema": schema_map}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 def get_table_structure(table_name: str):
     try:
         schema, bare_table = _parse_table_ref(table_name)

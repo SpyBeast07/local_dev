@@ -13,7 +13,7 @@ from services.docker import (
     get_dependency_graph, get_impact_analysis, trace_query
 )
 from services.ports import get_ports, kill_port_process
-from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config, truncate_tables
+from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config, truncate_tables, get_full_schema
 from services.backups import export_db, restore_db, export_table
 from services.seeding import run_seed_script
 
@@ -115,6 +115,10 @@ def kill_port(payload: KillPortPayload):
 @app.get("/db/tables")
 def tables():
     return get_tables()
+
+@app.get("/db/schema")
+def db_schema():
+    return get_full_schema()
 
 @app.get("/db/table/{table_name}")
 def table_data(table_name: str, limit: int = 20, offset: int = 0, sort_col: str = None, sort_dir: str = "asc"):
