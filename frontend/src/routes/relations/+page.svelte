@@ -11,9 +11,32 @@
 	let impactData = $state<any>(null);
 	let nodesDataSet: any = null;
 	let edgesDataSet: any = null;
+	let nodesView: any = null;
 	let queryInput = $state("");
 	let isTracing = $state(false);
 	let traceData = $state<any>(null);
+
+	let visibleCategories = $state({
+		container: true,
+		port: true,
+		database: true,
+		table: true
+	});
+
+	// Persistence
+	function saveSettings() {
+		localStorage.setItem("dependency_graph_settings", JSON.stringify({
+			visibleCategories: $state.snapshot(visibleCategories)
+		}));
+	}
+
+	function loadSettings() {
+		const saved = localStorage.getItem("dependency_graph_settings");
+		if (saved) {
+			const parsed = JSON.parse(saved);
+			Object.assign(visibleCategories, parsed.visibleCategories);
+		}
+	}
 
 	onMount(async () => {
 		try {
@@ -24,13 +47,17 @@
 			await tick();
 
 			if (container) {
-				const { DataSet } = await import("vis-network/standalone");
+				const { DataSet, DataView } = await import("vis-network/standalone");
 				nodesDataSet = new DataSet(backendNodes.map((n: any) => ({
 					...n,
 					group: n.type,
 					title: n.label,
 					originalColor: null
 				})));
+				
+				nodesView = new DataView(nodesDataSet, {
+					filter: (item: any) => visibleCategories[item.group as keyof typeof visibleCategories]
+				});
 				
 				edgesDataSet = new DataSet(backendEdges.map((e: any) => ({
 					...e,
@@ -39,7 +66,7 @@
 					originalColor: null
 				})));
 
-				const data = { nodes: nodesDataSet, edges: edgesDataSet };
+				const data = { nodes: nodesView, edges: edgesDataSet };
 
 				const options: any = {
 					groups: {
@@ -138,9 +165,12 @@
 					if (params.nodes.length === 0) {
 						selectedNode = null;
 						impactData = null;
-						resetHighlight();
+						refreshVisuals();
 					}
 				});
+
+				loadSettings();
+				refreshVisuals();
 			}
 		} catch (err: any) {
 			error = err.message || "Failed to analyze dependency mesh.";
@@ -148,14 +178,119 @@
 		}
 	});
 
+	function refreshVisuals() {
+		if (!nodesDataSet || !edgesDataSet) return;
+
+		const impactSet = new Set(impactData?.impact_ids || []);
+		const originSet = new Set(impactData?.tables || (impactData?.table ? [impactData.table] : []));
+
+		const nodeUpdates = nodesDataSet.map((n: any) => {
+			const isVisible = visibleCategories[n.group as keyof typeof visibleCategories];
+			const isImpacted = impactData ? impactSet.has(n.id) : true;
+			const isOrigin = impactData ? originSet.has(n.id) : false;
+
+			let opacity = 1;
+			let hidden = !isVisible; // Always hide if not visible
+
+			if (impactData && isVisible) {
+				opacity = isImpacted ? 1 : 0.05;
+			}
+
+			let color = n.originalColor || null;
+			if (impactData && isImpacted) {
+				if (isOrigin) color = { border: '#ef4444', background: '#7f1d1d', highlight: '#f87171' };
+				else if (n.type === 'table') color = { border: '#f97316', background: '#7c2d12', highlight: '#fb923c' };
+				else if (n.type === 'container') color = { border: '#0ea5e9', background: '#0c4a6e', highlight: '#38bdf8' };
+			}
+
+			return {
+				id: n.id,
+				hidden,
+				opacity,
+				color,
+				shadow: {
+					enabled: !hidden && (isImpacted || isOrigin),
+					size: isOrigin ? 30 : 10,
+					color: isOrigin ? 'rgba(239, 68, 68, 0.8)' : 'rgba(0,0,0,0.5)'
+				}
+			};
+		});
+
+		const edgeUpdates = edgesDataSet.map((e: any) => {
+			const fromNode = nodesDataSet.get(e.from);
+			const toNode = nodesDataSet.get(e.to);
+			if (!fromNode || !toNode) return e;
+
+			const fromVisible = visibleCategories[fromNode.group as keyof typeof visibleCategories];
+			const toVisible = visibleCategories[toNode.group as keyof typeof visibleCategories];
+			const isImpacted = impactData ? (impactSet.has(e.from) && impactSet.has(e.to)) : true;
+			
+			let hidden = !fromVisible || !toVisible;
+			let opacity = 0.8;
+			
+			if (impactData && !isImpacted) opacity = 0.05;
+
+			return {
+				id: e.id,
+				hidden,
+				color: { color: isImpacted && impactData ? '#f97316' : '#334155', opacity },
+				width: isImpacted && impactData ? 4 : 2
+			};
+		});
+
+		nodesDataSet.update(nodeUpdates);
+		edgesDataSet.update(edgeUpdates);
+		if (nodesView) nodesView.refresh();
+		saveSettings();
+	}
+
+	function toggleCategory(cat: keyof typeof visibleCategories) {
+		visibleCategories[cat] = !visibleCategories[cat];
+		refreshVisuals();
+	}
+
+	function isolateCategory(cat: keyof typeof visibleCategories) {
+		Object.keys(visibleCategories).forEach(key => {
+			visibleCategories[key as keyof typeof visibleCategories] = (key === cat);
+		});
+		refreshVisuals();
+	}
+
+	function fullView() {
+		Object.keys(visibleCategories).forEach(key => {
+			visibleCategories[key as keyof typeof visibleCategories] = true;
+		});
+		refreshVisuals();
+	}
+
+	function infraView() {
+		visibleCategories.container = true;
+		visibleCategories.port = true;
+		visibleCategories.database = false;
+		visibleCategories.table = false;
+		refreshVisuals();
+	}
+
+	function dataView() {
+		visibleCategories.container = false;
+		visibleCategories.port = false;
+		visibleCategories.database = true;
+		visibleCategories.table = true;
+		refreshVisuals();
+	}
+
+	function resetFilters() {
+		fullView();
+		refreshVisuals();
+	}
+
 	async function runTrace() {
 		if (!queryInput.trim()) return;
 		isTracing = true;
 		try {
 			const res = await axios.post("http://127.0.0.1:8000/system/trace-query", { query: queryInput });
-			traceData = res.data;
-			impactData = traceData;
-			highlightImpact(traceData.impact_ids, traceData.tables);
+			impactData = res.data;
+			refreshVisuals();
 		} catch (err) {
 			console.error("Trace failed:", err);
 		} finally {
@@ -205,22 +340,9 @@
 	}
 
 	function resetHighlight() {
-		if (!nodesDataSet || !edgesDataSet) return;
 		impactData = null;
 		traceData = null;
-		
-		nodesDataSet.update(nodesDataSet.map((n: any) => ({
-			id: n.id,
-			opacity: 1,
-			color: null,
-			shadow: { enabled: true, size: 10, color: 'rgba(0,0,0,0.5)' }
-		})));
-
-		edgesDataSet.update(edgesDataSet.map((e: any) => ({
-			id: e.id,
-			color: { color: '#334155', highlight: '#6366f1', opacity: 0.8 },
-			width: 2
-		})));
+		refreshVisuals();
 	}
 
 	function closePanel() {
@@ -261,24 +383,82 @@
 				</div>
 			{/if}
 
-			<div class="absolute top-8 left-8 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-6 py-4 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-4">
-				<div class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">LEGEND</div>
-				<div class="grid grid-cols-2 gap-x-6 gap-y-3">
-					<div class="flex items-center gap-3">
-						<div class="w-3 h-3 rounded-sm bg-sky-500 shadow-lg shadow-sky-500/50"></div>
-						<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Container</span>
+			<div class="absolute top-8 left-8 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-6 py-5 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col gap-5 w-64 animate-in fade-in slide-in-from-left duration-500">
+				<div>
+					<div class="flex items-center justify-between mb-4">
+						<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">LEGEND</span>
+						<button 
+							onclick={resetFilters}
+							class="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-1"
+						>
+							<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+							Reset
+						</button>
 					</div>
-					<div class="flex items-center gap-3">
-						<div class="w-3 h-3 rounded-full bg-amber-500 shadow-lg shadow-amber-500/50"></div>
-						<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Port</span>
+					<div class="grid grid-cols-2 gap-x-6 gap-y-3">
+						<!-- Legend Toggles -->
+						<button 
+							onclick={() => toggleCategory('container')}
+							ondblclick={() => isolateCategory('container')}
+							class="flex items-center gap-3 cursor-pointer group text-left {visibleCategories.container ? '' : 'opacity-30 grayscale'}"
+							title="Click to toggle, Double-click to isolate"
+						>
+							<div class="w-3 h-3 rounded-sm bg-sky-500 shadow-lg shadow-sky-500/50 group-hover:scale-110 transition-transform"></div>
+							<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none">Container</span>
+						</button>
+						<button 
+							onclick={() => toggleCategory('port')}
+							ondblclick={() => isolateCategory('port')}
+							class="flex items-center gap-3 cursor-pointer group text-left {visibleCategories.port ? '' : 'opacity-30 grayscale'}"
+							title="Click to toggle, Double-click to isolate"
+						>
+							<div class="w-3 h-3 rounded-full bg-amber-500 shadow-lg shadow-amber-500/50 group-hover:scale-110 transition-transform"></div>
+							<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none">Port</span>
+						</button>
+						<button 
+							onclick={() => toggleCategory('database')}
+							ondblclick={() => isolateCategory('database')}
+							class="flex items-center gap-3 cursor-pointer group text-left {visibleCategories.database ? '' : 'opacity-30 grayscale'}"
+							title="Click to toggle, Double-click to isolate"
+						>
+							<div class="w-3 h-3 rounded-sm bg-emerald-500 shadow-lg shadow-emerald-500/50 group-hover:scale-110 transition-transform"></div>
+							<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none">Database</span>
+						</button>
+						<button 
+							onclick={() => toggleCategory('table')}
+							ondblclick={() => isolateCategory('table')}
+							class="flex items-center gap-3 cursor-pointer group text-left {visibleCategories.table ? '' : 'opacity-30 grayscale'}"
+							title="Click to toggle, Double-click to isolate"
+						>
+							<div class="w-3 h-3 rounded-sm bg-indigo-500 shadow-lg shadow-indigo-500/50 group-hover:scale-110 transition-transform"></div>
+							<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none">Table</span>
+						</button>
 					</div>
-					<div class="flex items-center gap-3">
-						<div class="w-3 h-3 rounded-sm bg-emerald-500 shadow-lg shadow-emerald-500/50"></div>
-						<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Database</span>
-					</div>
-					<div class="flex items-center gap-3">
-						<div class="w-3 h-3 rounded-sm bg-indigo-500 shadow-lg shadow-indigo-500/50"></div>
-						<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Table</span>
+				</div>
+
+				<div class="h-px bg-slate-200 dark:bg-slate-800"></div>
+
+				<div>
+					<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block">Presets</span>
+					<div class="flex flex-wrap gap-2">
+						<button 
+							onclick={infraView}
+							class="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500 dark:hover:bg-indigo-600 text-slate-600 dark:text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all"
+						>
+							Infra
+						</button>
+						<button 
+							onclick={dataView}
+							class="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500 dark:hover:bg-indigo-600 text-slate-600 dark:text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all"
+						>
+							Data
+						</button>
+						<button 
+							onclick={fullView}
+							class="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500 dark:hover:bg-indigo-600 text-slate-600 dark:text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all"
+						>
+							Full
+						</button>
 					</div>
 				</div>
 			</div>
