@@ -1,6 +1,8 @@
 # DevBeast 🚀
 
-**DevBeast is a local-first DevOps control plane that gives developers real-time visibility and control over their entire development stack — containers, databases, and services — without context switching.**
+**DevBeast is a local-first DevOps control plane that gives developers structural visibility and high-speed control over their entire development stack — containers, databases, and services — in a single pane of glass.**
+
+![DevBeast Dashboard Mockup](docs/images/dashboard_mockup.png)
 
 ## 😩 The Problem
 Modern development requires juggling multiple fragmented tools:
@@ -11,7 +13,7 @@ Modern development requires juggling multiple fragmented tools:
 
 This leads to constant **context switching**, **slow debugging**, and **zero structural visibility**.
 
-## ⚡ Why DevBeast?
+## 🧬 Why DevBeast?
 DevBeast eliminates tool fragmentation by acting as a **centralized command center**.
 - ⚡ **Unified Visibility**: See your entire infrastructure in a single pane of glass.
 - 🧠 **Structural Intelligence**: Understand how a single SQL change impacts your services.
@@ -19,9 +21,41 @@ DevBeast eliminates tool fragmentation by acting as a **centralized command cent
 
 ---
 
+## 🧪 Real-World Workflows
+
+### 🔍 Debug a Broken API
+Click a failed service → instantly see:
+- Connected database and specific schemas
+- Dependent tables and record flow
+- Failing query paths via visual trace context
+
+### 🛡️ Safe Schema Changes
+Before you `ALTER TABLE` or `DROP`:
+- View the **Impact Radius** of your change
+- Identify affected services and downstream containers
+- Avoid "Production-Breaking" changes by computing dependencies in advance
+
+### ♻️ Reset & Recover Fast
+- **Backup → Experiment → Restore**: Create idempotent snapshots with a single click before risky refactoring.
+- **Reset & Reseed**: Instantly wipe the database and reseed with clean test data for rapid development cycles.
+
+---
+
+## 🥊 Why Not Existing Tools?
+
+| Problem | Existing Tools | **DevBeast** |
+| :--- | :--- | :--- |
+| **Full Stack Visibility** | Fragmented (Portainer + pgAdmin) | **Unified Pane of Glass** |
+| **Dependency Mapping** | Manual / Mental | **Live Topological Graph** |
+| **Risk Analysis** | None | **Impact Severity Scoring** |
+| **SQL Writing** | Basic Editor | **Schema-Aware Autocomplete** |
+| **Context Switching** | Highly required | **Completely Eliminated** |
+
+---
+
 ## 🧠 Structural Intelligence
 
-### 🧬 Topological Dependency Graph
+### 🗺️ Live Dependency Mesh
 DevBeast builds a live map of your stack. Visualize the relationships between:
 - **Containers ↔ Database Connections**
 - **Database ↔ Port Mappings**
@@ -29,45 +63,27 @@ DevBeast builds a live map of your stack. Visualize the relationships between:
 
 ### ⌨️ Schema-Aware SQL Autocomplete
 A professional-grade, high-performance SQL editor integrated into the core dashboard.
-- **Context-Aware Suggestions**: Ranks completions based on cursor position (e.g., Tables after `FROM`, Columns after `u.`).
-- **Alias Resolution**: Dynamically parses queries to resolve table aliases (`SELECT u.name FROM users u`) and multi-table JOINs.
-- **Live Metadata Caching**: Sub-50ms autocomplete powered by an in-memory schema store and backend metadata synchronization.
-- **Rich Visuals**: Syntax highlighting, fuzzy matching, and distinct icons for tables (🗄️), columns (📄), and keywords (⚡).
+- **Context-Aware Suggestions**: Ranks completions based on cursor position (Tables after `FROM`, Columns after `alias.`).
+- **Alias Resolution**: Dynamically parses queries to resolve table aliases and multi-table JOINs.
+- **Live Metadata Caching**: Sub-50ms autocomplete powered by an in-memory schema store.
 
 ### 💥 Impact Analysis (Blast Radius)
 Before you `COMMIT`, DevBeast computes the structural fallout of your changes.
 - **Dependency Detection**: Identify which tables, containers, and services are downstream of your query.
 - **Severity Scoring**: Automatically classifies impact as **LOW**, **MEDIUM**, or **HIGH** based on infrastructure risk.
 
-### 🔍 Query Trace Flow
-Execute SQL and watch DevBeast visually highlight the "Blast Radius" in real-time. Seamlessly jump from the raw SQL editor to the graph view with pre-synchronized impact data.
-
-### 🎯 Interactive Plotting & Filtering
-The dependency mesh is now fully interactive with advanced filtering controls:
-- **Legend Toggles**: Instantly hide/show categories (Containers, Ports, Databases, Tables).
-- **Isolation Mode**: Double-click any category to solo its visibility and simplify complex meshes.
-- **Quick View Presets**: One-click toggles for "Infra View" (Compute/Network) and "Data View" (Relational/Storage).
-- **Visual Persistence**: Legend states are automatically saved to `localStorage` for a consistent workspace.
-
 ---
 
-## 🚀 Portability Engine
+## 🛡️ Data Safety & Recovery
 
-### 📥 SQL Backup & Restore
-DevBeast provides high-fidelity, container-native database portability.
-- **Idempotent Snapshots**: Exports `.sql` dumps with `--clean` and `--if-exists` flags, ensuring snapshots are "Restore-Ready" for any environment.
-- **Force Restore Layer**: Optionally wipe the `public` schema before restoration to resolve structural collisions with a single click.
-- **Zero Host Dependencies**: Executes `pg_dump` and `psql` directly inside your containers via `docker exec`.
+### 📥 Idempotent Backup & Restore
+- **Snapshot Logic**: Exports `.sql` dumps with `--clean` and `--if-exists` flags, ensuring snapshots are "Restore-Ready".
+- **Force Restore Layer**: Optionally wipe the `public` schema before restoration to resolve structural collisions.
+- **Zero Host Dependencies**: Executes directly inside your containers via `docker exec`.
 
----
-
-## 🧩 Control Plane Features
-
-- 🔥 **Port Killer**: Surgically terminate active local ports without leaving the dashboard.
-- 🛡️ **SQL Guardrails**: Prevents unsafe queries and enforces execution patterns like timeouts and row caps.
-- ⚙️ **Smart Validation**: Configurations only commit when connectivity is verified.
-- ✏️ **Inline Data Editing**: High-speed, typed manipulation of database records.
-- 🧬 **Failure Visualization**: Instant visual feedback on broken connection paths or unhealthy containers.
+### 🧪 Reset & Reseed Engine
+- Instantly reset your database to a verified baseline.
+- Automate the seeding of test data for high-speed debugging workflows.
 
 ---
 
@@ -86,17 +102,6 @@ DevBeast provides high-fidelity, container-native database portability.
 - PostgreSQL Database
 
 ### 1. Start the Backend API
-
-**Using `uv` (recommended):**
-```bash
-cd backend
-uv venv venv
-source venv/bin/activate
-uv pip install -r requirements.txt
-uvicorn main:app --reload
-```
-
-**Using `pip`:**
 ```bash
 cd backend
 python3 -m venv venv
@@ -104,7 +109,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
-*Note: The backend runs natively on `http://127.0.0.1:8000`.*
+*Note: Available at `http://127.0.0.1:8000`.*
 
 ### 2. Start the Frontend Application
 ```bash
@@ -115,8 +120,18 @@ npm run dev
 *Note: Available at `http://localhost:5173`.*
 
 ### 3. Connect Your Environment
-Navigate to the **⚙️ Settings** tab, input your database credentials, and commit the configuration to instantly unlock the **Dependency Graph** and **Impact Analysis** workspace.
+Navigate to the **⚙️ Settings** tab, input your database credentials, and commit to instantly unlock the **Dependency Graph** workspace.
 
 ---
 
+> [!NOTE]
+> **A Note for Developers**: DevBeast is designed and optimized for **local-first** workflows and **PostgreSQL-based** development environments. It is a control plane for high-speed local experimentation, not yet intended for production clusters.
+
+## 🚀 Try It Out
+
+Spin up your local stack and see your system like never before. 
+
+If you’ve ever struggled with understanding database relationships, debugging across services, or safely modifying schemas — **DevBeast will change how you work.**
+
+---
 *Built for high-performance developer experience (DX) and structural visibility.*
