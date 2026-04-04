@@ -331,10 +331,11 @@ def get_dependency_graph():
                         })
                         break
 
-    # 4. Create Project Headers and Membership Edges
+    # 4. Create Project Headers and Membership Edges (ONLY FOR MULTI-CONTAINER PROJECTS)
     for proj, data in projects_map.items():
-        if proj == "Standalone" or not proj:
-            continue # No header for standalone containers, keep them floating.
+        # Hide header if there's only a single container in the project
+        if proj == "Standalone" or not proj or len(data["instances"]) <= 1:
+            continue
             
         header_id = f"project_header_{proj}"
         nodes_map[header_id] = {
