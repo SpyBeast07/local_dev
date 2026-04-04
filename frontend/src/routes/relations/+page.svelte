@@ -11,9 +11,9 @@
 	let network: Network | null = null;
 	let selectedNode = $state<any>(null);
 	let impactData = $state<any>(null);
-	let nodesDataSet: any = null;
-	let edgesDataSet: any = null;
-	let nodesView: any = null;
+	let nodesDataSet = $state<any>(null);
+	let edgesDataSet = $state<any>(null);
+	let nodesView = $state<any>(null);
 	let queryInput = $state('');
 	let isTracing = $state(false);
 	let traceData = $state<any>(null);
@@ -24,13 +24,23 @@
 		database: true,
 		table: true
 	});
+	let hiddenNodeIds = $state<Record<string, boolean>>({});
+	let expandedGroups = $state<Record<string, boolean>>({
+		container: true,
+		database: true,
+		table: false,
+		port: false
+	});
+	let activeTooltip = $state<string | null>(null);
+	let searchTerm = $state('');
 
 	// Persistence
 	function saveSettings() {
 		localStorage.setItem(
 			'dependency_graph_settings',
 			JSON.stringify({
-				visibleCategories: $state.snapshot(visibleCategories)
+				visibleCategories: $state.snapshot(visibleCategories),
+				hiddenNodeIds: $state.snapshot(hiddenNodeIds)
 			})
 		);
 	}
@@ -40,6 +50,9 @@
 		if (saved) {
 			const parsed = JSON.parse(saved);
 			Object.assign(visibleCategories, parsed.visibleCategories);
+			if (parsed.hiddenNodeIds) {
+				Object.assign(hiddenNodeIds, parsed.hiddenNodeIds);
+			}
 		}
 	}
 
@@ -62,6 +75,15 @@
 			loading = false;
 			await tick();
 
+			// Close tooltips on outside click
+			window.addEventListener('click', (e) => {
+				const target = e.target as HTMLElement;
+				// Close if clicking outside the legend/tooltip area
+				if (!target.closest('.legend-container')) {
+					activeTooltip = null;
+				}
+			});
+
 			if (container) {
 				const { DataSet, DataView } = await import('vis-network/standalone');
 				nodesDataSet = new DataSet(
@@ -75,8 +97,16 @@
 
 				nodesView = new DataView(nodesDataSet, {
 					filter: (item: any) => {
+						if (hiddenNodeIds[item.id]) return false;
 						const group = item.group as string;
-						if (group === 'service_group') return visibleCategories.container;
+						if (group === 'service_group') {
+							const children = nodesDataSet.get({
+								filter: (childNode: any) => 
+									childNode.group === 'container' && 
+									childNode.metadata?.project === item.metadata?.project_name
+							});
+							return children.some((c: any) => visibleCategories.container && !hiddenNodeIds[c.id]);
+						}
 						return visibleCategories[group as keyof typeof visibleCategories] ?? true;
 					}
 				});
@@ -221,8 +251,16 @@
 		const originSet = new Set(impactData?.tables || (impactData?.table ? [impactData.table] : []));
 
 		const nodeUpdates = nodesDataSet.map((n: any) => {
+			if (hiddenNodeIds[n.id]) return { id: n.id, hidden: true, opacity: 0 };
 			let isVisible = visibleCategories[n.group as keyof typeof visibleCategories] ?? true;
-			if (n.group === 'service_group') isVisible = visibleCategories.container;
+			if (n.group === 'service_group') {
+				const children = nodesDataSet.get({
+					filter: (child: any) => 
+						child.group === 'container' && 
+						child.metadata?.project === n.metadata?.project_name
+				});
+				isVisible = children.some((c: any) => visibleCategories.container && !hiddenNodeIds[c.id]);
+			}
 			const isImpacted = impactData ? impactSet.has(n.id) : true;
 			const isOrigin = impactData ? originSet.has(n.id) : false;
 
@@ -260,13 +298,22 @@
 			const toNode = nodesDataSet.get(e.to);
 			if (!fromNode || !toNode) return e;
 
-			const getVis = (group: string) => {
-				if (group === 'service_group') return visibleCategories.container;
+			const getVis = (group: string, id: string) => {
+				if (hiddenNodeIds[id]) return false;
+				if (group === 'service_group') {
+					const node = nodesDataSet.get(id);
+					const children = nodesDataSet.get({
+						filter: (child: any) => 
+							child.group === 'container' && 
+							child.metadata?.project === node.metadata?.project_name
+					});
+					return children.some((c: any) => visibleCategories.container && !hiddenNodeIds[c.id]);
+				}
 				return visibleCategories[group as keyof typeof visibleCategories] ?? true;
 			};
 
-			const fromVisible = getVis(fromNode.group);
-			const toVisible = getVis(toNode.group);
+			const fromVisible = getVis(fromNode.group, fromNode.id);
+			const toVisible = getVis(toNode.group, toNode.id);
 			const isImpacted = impactData ? impactSet.has(e.from) && impactSet.has(e.to) : true;
 
 			let hidden = !fromVisible || !toVisible;
@@ -342,7 +389,31 @@
 
 	function resetFilters() {
 		fullView();
+		hiddenNodeIds = {};
 		refreshVisuals();
+	}
+
+	function toggleNode(id: string) {
+		hiddenNodeIds[id] = !hiddenNodeIds[id];
+		refreshVisuals();
+	}
+
+	function toggleGroupNodes(type: string, show: boolean) {
+		const nodes = nodesDataSet.get({ filter: (n: any) => n.type === type });
+		nodes.forEach((n: any) => {
+			hiddenNodeIds[n.id] = !show;
+		});
+		saveSettings();
+		refreshVisuals();
+	}
+
+	function toggleAccordion(type: string) {
+		expandedGroups[type] = !expandedGroups[type];
+	}
+
+	function toggleTooltip(type: string | null) {
+		if (activeTooltip === type) activeTooltip = null;
+		else activeTooltip = type;
 	}
 
 	async function runTrace() {
@@ -484,7 +555,7 @@
 			{/if}
 
 			<div
-				class="absolute top-8 left-8 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-6 py-5 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col gap-5 w-64 animate-in fade-in slide-in-from-left duration-500"
+				class="legend-container absolute top-8 left-8 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-6 py-5 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col gap-5 w-64 animate-in fade-in slide-in-from-left duration-500"
 			>
 				<div>
 					<div class="flex items-center justify-between mb-4">
@@ -507,71 +578,77 @@
 						</button>
 					</div>
 					<div class="grid grid-cols-2 gap-x-6 gap-y-3">
-						<!-- Legend Toggles -->
-						<button
-							onclick={() => toggleCategory('container')}
-							ondblclick={() => isolateCategory('container')}
-							class="flex items-center gap-3 cursor-pointer group text-left {visibleCategories.container
-								? ''
-								: 'opacity-30 grayscale'}"
-							title="Click to toggle, Double-click to isolate"
-						>
-							<div
-								class="w-3 h-3 rounded-sm bg-sky-500 shadow-lg shadow-sky-500/50 group-hover:scale-110 transition-transform"
-							></div>
-							<span
-								class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none"
-								>Container</span
-							>
-						</button>
-						<button
-							onclick={() => toggleCategory('port')}
-							ondblclick={() => isolateCategory('port')}
-							class="flex items-center gap-3 cursor-pointer group text-left {visibleCategories.port
-								? ''
-								: 'opacity-30 grayscale'}"
-							title="Click to toggle, Double-click to isolate"
-						>
-							<div
-								class="w-3 h-3 rounded-full bg-amber-500 shadow-lg shadow-amber-500/50 group-hover:scale-110 transition-transform"
-							></div>
-							<span
-								class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none"
-								>Port</span
-							>
-						</button>
-						<button
-							onclick={() => toggleCategory('database')}
-							ondblclick={() => isolateCategory('database')}
-							class="flex items-center gap-3 cursor-pointer group text-left {visibleCategories.database
-								? ''
-								: 'opacity-30 grayscale'}"
-							title="Click to toggle, Double-click to isolate"
-						>
-							<div
-								class="w-3 h-3 rounded-sm bg-emerald-500 shadow-lg shadow-emerald-500/50 group-hover:scale-110 transition-transform"
-							></div>
-							<span
-								class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none"
-								>Database</span
-							>
-						</button>
-						<button
-							onclick={() => toggleCategory('table')}
-							ondblclick={() => isolateCategory('table')}
-							class="flex items-center gap-3 cursor-pointer group text-left {visibleCategories.table
-								? ''
-								: 'opacity-30 grayscale'}"
-							title="Click to toggle, Double-click to isolate"
-						>
-							<div
-								class="w-3 h-3 rounded-sm bg-indigo-500 shadow-lg shadow-indigo-500/50 group-hover:scale-110 transition-transform"
-							></div>
-							<span
-								class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none"
-								>Table</span
-							>
-						</button>
+						{#each [ 
+							{ id: 'container', label: 'Container', color: 'bg-sky-500', shape: 'rounded-sm' }, 
+							{ id: 'port', label: 'Port', color: 'bg-amber-500', shape: 'rounded-full' }, 
+							{ id: 'database', label: 'Database', color: 'bg-emerald-500', shape: 'rounded-sm' }, 
+							{ id: 'table', label: 'Table', color: 'bg-indigo-500', shape: 'rounded-sm' } 
+						] as cat}
+							<div class="relative">
+								<div 
+									class="flex items-center gap-3 group {visibleCategories[cat.id as keyof typeof visibleCategories] ? '' : 'opacity-30 grayscale'}"
+								>
+									<button
+										onclick={(e) => { e.stopPropagation(); toggleCategory(cat.id as any); }}
+										ondblclick={() => isolateCategory(cat.id as any)}
+										class="w-3 h-3 {cat.shape} {cat.color} shadow-lg shadow-current/50 cursor-pointer hover:scale-125 transition-transform"
+										title="Toggle Category (Dbl-click to isolate)"
+									></button>
+									<button 
+										onclick={(e) => { e.stopPropagation(); toggleTooltip(cat.id); }}
+										class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none hover:text-indigo-500 transition-colors text-left truncate flex-1 tooltip-trigger"
+									>
+										{cat.label}
+									</button>
+								</div>
+
+								{#if activeTooltip === cat.id}
+									{@const nodes = nodesDataSet?.get({ filter: (n: any) => n.type === cat.id }) || []}
+									{@const allVisible = nodes.every((n: any) => !hiddenNodeIds[n.id])}
+									<!-- Tooltip Dialog -->
+									<div 
+										class="absolute top-full left-0 mt-3 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[100] p-4 animate-in fade-in zoom-in-95 duration-200"
+									>
+										<div class="flex items-center justify-between mb-4">
+											<span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">{cat.label}S</span>
+											<button 
+												onclick={(e) => { e.stopPropagation(); toggleGroupNodes(cat.id, !allVisible); }}
+												class="text-[8px] font-black uppercase px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-indigo-500 hover:text-white transition-all"
+											>
+												{allVisible ? 'Hide All' : 'Show All'}
+											</button>
+										</div>
+
+										<div class="max-h-48 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+											{#if nodes.length === 0}
+												<div class="text-[9px] text-slate-400 italic py-2">No {cat.label.toLowerCase()}s found.</div>
+											{:else}
+												{#each nodes as node}
+													<button
+														onclick={(e) => {
+															e.stopPropagation();
+															toggleNode(node.id);
+															saveSettings();
+														}}
+														class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition-all {hiddenNodeIds[node.id] ? 'opacity-40' : 'bg-slate-100/50 dark:bg-white/5 shadow-sm'}"
+													>
+														<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 truncate pr-2">{node.label}</span>
+														<div class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all {hiddenNodeIds[node.id] ? 'border-slate-300 dark:border-slate-700' : 'bg-indigo-500 border-indigo-500'}">
+															{#if !hiddenNodeIds[node.id]}
+																<svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"/></svg>
+															{/if}
+														</div>
+													</button>
+												{/each}
+											{/if}
+										</div>
+
+										<!-- Triangle Pointer -->
+										<div class="absolute -top-1.5 left-3 w-3 h-3 bg-white dark:bg-slate-900 border-t border-l border-slate-200 dark:border-slate-800 rotate-45"></div>
+									</div>
+								{/if}
+							</div>
+						{/each}
 					</div>
 				</div>
 
