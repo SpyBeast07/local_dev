@@ -22,7 +22,8 @@
 		container: true,
 		port: true,
 		database: true,
-		table: true
+		table: true,
+		service_group: true
 	});
 
 	// Persistence
@@ -74,7 +75,10 @@
 				);
 
 				nodesView = new DataView(nodesDataSet, {
-					filter: (item: any) => visibleCategories[item.group as keyof typeof visibleCategories]
+					filter: (item: any) => {
+						const cat = item.group as keyof typeof visibleCategories;
+						return visibleCategories[cat] ?? true;
+					}
 				});
 
 				edgesDataSet = new DataSet(
@@ -90,6 +94,16 @@
 
 				const options: any = {
 					groups: {
+						service_group: {
+							shape: 'hexagon',
+							color: {
+								border: '#6366f1',
+								background: '#312e81',
+								highlight: '#818cf8'
+							},
+							font: { color: '#ffffff', face: 'Outfit', size: 20, bold: true },
+							margin: 15
+						},
 						container: {
 							shape: 'box',
 							color: {
@@ -207,7 +221,7 @@
 		const originSet = new Set(impactData?.tables || (impactData?.table ? [impactData.table] : []));
 
 		const nodeUpdates = nodesDataSet.map((n: any) => {
-			const isVisible = visibleCategories[n.group as keyof typeof visibleCategories];
+			const isVisible = visibleCategories[n.group as keyof typeof visibleCategories] ?? true;
 			const isImpacted = impactData ? impactSet.has(n.id) : true;
 			const isOrigin = impactData ? originSet.has(n.id) : false;
 
@@ -223,7 +237,7 @@
 				if (isOrigin) color = { border: '#ef4444', background: '#7f1d1d', highlight: '#f87171' };
 				else if (n.type === 'table')
 					color = { border: '#f97316', background: '#7c2d12', highlight: '#fb923c' };
-				else if (n.type === 'container')
+				else if (n.type === 'container' || n.type === 'service_group')
 					color = { border: '#0ea5e9', background: '#0c4a6e', highlight: '#38bdf8' };
 			}
 
@@ -245,20 +259,37 @@
 			const toNode = nodesDataSet.get(e.to);
 			if (!fromNode || !toNode) return e;
 
-			const fromVisible = visibleCategories[fromNode.group as keyof typeof visibleCategories];
-			const toVisible = visibleCategories[toNode.group as keyof typeof visibleCategories];
+			const fromVisible = visibleCategories[fromNode.group as keyof typeof visibleCategories] ?? true;
+			const toVisible = visibleCategories[toNode.group as keyof typeof visibleCategories] ?? true;
 			const isImpacted = impactData ? impactSet.has(e.from) && impactSet.has(e.to) : true;
 
 			let hidden = !fromVisible || !toVisible;
 			let opacity = 0.8;
+			let dashes = e.type === 'membership';
+
+			if (e.type === 'membership') {
+				opacity = 0.2;
+			}
 
 			if (impactData && !isImpacted) opacity = 0.05;
 
 			return {
 				id: e.id,
 				hidden,
-				color: { color: isImpacted && impactData ? '#f97316' : '#334155', opacity },
-				width: isImpacted && impactData ? 4 : 2
+				dashes,
+				color: {
+					color:
+						isImpacted && impactData
+							? '#f97316'
+							: e.type === 'provides'
+								? '#10b981'
+								: e.type === 'membership'
+									? '#475569'
+									: '#334155',
+					opacity
+				},
+				width: isImpacted && impactData ? 4 : e.type === 'provides' ? 4 : e.type === 'membership' ? 1 : 2,
+				arrows: e.type === 'membership' ? '' : 'to'
 			};
 		});
 
@@ -665,7 +696,12 @@
 						</h2>
 					{:else if selectedNode}
 						<div class="flex items-center gap-3 mb-2">
-							{#if selectedNode.type === 'container'}
+							{#if selectedNode.type === 'service_group'}
+								<span
+									class="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20"
+									>Project Cluster</span
+								>
+							{:else if selectedNode.type === 'container'}
 								<span
 									class="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-500 text-[10px] font-black uppercase tracking-widest border border-sky-500/20"
 									>Compute Node</span
@@ -755,11 +791,43 @@
 						{/if}
 
 						{#if selectedNode && selectedNode.metadata && !traceData}
+							{#if selectedNode.type === 'service_group'}
+								<section>
+									<h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+										Project Overview
+									</h3>
+									<div class="space-y-4">
+										<div class="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
+											<div class="text-[9px] font-bold text-indigo-400 uppercase mb-1">
+												Project Stack
+											</div>
+											<div class="text-2xl font-black text-indigo-500 tracking-tighter uppercase italic">
+												{selectedNode.metadata.project_name}
+											</div>
+										</div>
+										<div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+											<div class="text-[9px] font-bold text-slate-400 uppercase mb-1">
+												Total Scaling
+											</div>
+											<div class="text-xs font-bold text-slate-700 dark:text-slate-300">
+												{selectedNode.metadata.instance_count} CONTAINERS
+											</div>
+										</div>
+									</div>
+								</section>
+							{/if}
 							{#if selectedNode.type === 'container'}
 								<section>
-									<h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">
-										Service Details
-									</h3>
+									<div class="flex items-center justify-between mb-3">
+										<h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+											Service Details
+										</h3>
+										{#if selectedNode.metadata.is_group}
+											<span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-500 text-[9px] font-black uppercase tracking-widest border border-indigo-500/20">
+												{selectedNode.metadata.instance_count} INSTANCES
+											</span>
+										{/if}
+									</div>
 									<div class="space-y-3">
 										<div
 											class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800"
@@ -773,6 +841,24 @@
 												{selectedNode.metadata.image}
 											</div>
 										</div>
+										
+										{#if selectedNode.metadata.is_group}
+											<div
+												class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800"
+											>
+												<div class="text-[9px] font-bold text-slate-400 uppercase mb-1">
+													Active Instances
+												</div>
+												<div class="flex flex-wrap gap-1 mt-1">
+													{#each selectedNode.metadata.instances as inst}
+														<span class="text-[9px] px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded-md font-bold border border-indigo-500/10 uppercase tracking-tighter">
+															{inst}
+														</span>
+													{/each}
+												</div>
+											</div>
+										{/if}
+
 										<div
 											class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800"
 										>
@@ -780,7 +866,7 @@
 												Runtime Status
 											</div>
 											<div class="text-xs font-bold text-emerald-500">
-												{selectedNode.metadata.status}
+												{selectedNode.metadata.status_summary || selectedNode.metadata.status}
 											</div>
 										</div>
 									</div>

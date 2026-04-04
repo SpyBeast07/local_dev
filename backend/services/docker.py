@@ -18,19 +18,30 @@ def get_containers():
 
                 labels_str = data.get("Labels", "")
                 project = "Standalone"
+                service = None
+
                 if labels_str:
                     for label in labels_str.split(","):
                         if label.startswith("com.docker.compose.project="):
                             project = label.split("=", 1)[1]
-                            break
+                        if label.startswith("com.docker.compose.service="):
+                            service = label.split("=", 1)[1]
+
+                # Fallback service name from container name if no labels found
+                c_name = data.get("Names", "").lstrip('/')
+                if not service:
+                    # Strip common instance suffixes: _1, -1, .1
+                    import re
+                    service = re.sub(r'[\._-]\d+$', '', c_name)
 
                 containers.append({
                     "id": data.get("ID"),
-                    "name": data.get("Names"),
+                    "name": c_name,
                     "image": data.get("Image"),
                     "status": data.get("Status"),
                     "ports": data.get("Ports"),
-                    "project": project
+                    "project": project,
+                    "service": service or c_name
                 })
 
         return containers
@@ -233,19 +244,28 @@ def get_dependency_graph():
             "type": "contains"
         })
 
-    # 3. Process Containers
+    # 3. Process Containers with Project-level Clustering
+    projects_map = {}
     for c in containers:
+        proj = c["project"]
+        if proj not in projects_map:
+            projects_map[proj] = {
+                "instances": [],
+                "image": c["image"] # Fallback image for header (usually from first container)
+            }
+        
         c_id = c["id"]
         details = get_container_details(c_id)
-        if not details:
-            continue
-            
-        c_name = c["name"].lstrip('/')
-        nodes_map[c_id] = {
-            "id": c_id,
+        if not details: continue
+        
+        # Individual Container Node
+        c_node_id = f"container_{c_id}"
+        nodes_map[c_node_id] = {
+            "id": c_node_id,
             "type": "container",
-            "label": c_name.upper(),
+            "label": c["name"].upper(),
             "metadata": {
+                "id": c_id,
                 "image": c["image"],
                 "status": c["status"],
                 "project": c["project"],
@@ -253,18 +273,19 @@ def get_dependency_graph():
                 "networks": details.get("NetworkSettings", {}).get("Networks", {})
             }
         }
+        projects_map[proj]["instances"].append(c_node_id)
         
-        # Ports
+        # 3.1 Ports for this instance
         port_bindings = details.get("NetworkSettings", {}).get("Ports", {}) or {}
+        is_running = c["status"].strip().lower().startswith("up")
+        db_port_str = str(db_config.get("db_port", "5432"))
+        
         for container_port, host_bindings in port_bindings.items():
             if host_bindings:
                 for binding in host_bindings:
                     host_port = binding.get("HostPort")
-                    if not host_port:
-                        continue
+                    if not host_port: continue
                     port_id = f"port_{host_port}"
-                    
-                    # Deduplicate port nodes (same host port might be bound to multiple IPs)
                     if port_id not in nodes_map:
                         nodes_map[port_id] = {
                             "id": port_id,
@@ -277,30 +298,63 @@ def get_dependency_graph():
                             }
                         }
                     edges.append({
-                        "from": c_id,
+                        "from": c_node_id,
                         "to": port_id,
                         "type": "exposes",
                         "label": "EXPOSE"
                     })
+                    
+                    # 3.1.1 PROVIDER DISCOVERY: If this is providing the active db_port
+                    if str(host_port) == db_port_str and is_running:
+                        edges.append({
+                            "from": c_node_id,
+                            "to": db_node_id,
+                            "type": "provides",
+                            "label": "HOSTS DB"
+                        })
         
-        # DB Connections (Env parsing)
-        envs = details.get("Config", {}).get("Env", []) or []
-        is_connected = False
+        # 3.2 SQL Connectivity for this instance (ONLY IF RUNNING)
+        if is_running:
+            envs = details.get("Config", {}).get("Env", []),
+            if isinstance(envs, tuple): envs = envs[0]
+            if not envs: envs = []
+
+            for env in envs:
+                if '=' in env:
+                    _, val = env.split('=', 1)
+                    if val == db_host or db_host in val:
+                        edges.append({
+                            "from": c_node_id,
+                            "to": db_node_id,
+                            "type": "connects_to",
+                            "label": "SQL"
+                        })
+                        break
+
+    # 4. Create Project Headers and Membership Edges
+    for proj, data in projects_map.items():
+        if proj == "Standalone" or not proj:
+            continue # No header for standalone containers, keep them floating.
+            
+        header_id = f"project_header_{proj}"
+        nodes_map[header_id] = {
+            "id": header_id,
+            "type": "service_group", # Using existing UI group for consistency
+            "label": proj.upper(),
+            "metadata": {
+                "is_project_header": True,
+                "instance_count": len(data["instances"]),
+                "instances": data["instances"],
+                "project_name": proj
+            }
+        }
         
-        for env in envs:
-            if '=' in env:
-                key, val = env.split('=', 1)
-                # Simple heuristic: if the env contains our current db_host
-                if val == db_host or db_host in val:
-                    is_connected = True
-                    break
-        
-        if is_connected:
+        for inst_id in data["instances"]:
             edges.append({
-                "from": c_id,
-                "to": db_node_id,
-                "type": "connects_to",
-                "label": "SQL"
+                "from": header_id,
+                "to": inst_id,
+                "type": "membership",
+                "label": ""
             })
             
     return {"nodes": list(nodes_map.values()), "edges": edges}
@@ -439,11 +493,17 @@ def get_impact_analysis(table_name: str):
                 impacted_services.append(e["to"])
                 
     # Compile All Affected IDs for Frontend Highlighting
-    # Origin Table + Dependents + DB + Containers + Services
+    # Origin Table + Dependents + DB + Containers + Services + Service Headers
     impact_ids = [table_name] + dependent_tables
     if db_node_id: impact_ids.append(db_node_id)
     impact_ids += impacted_containers
     impact_ids += impacted_services
+    
+    # Also find Service Headers for these containers to highlight the "Heading"
+    for cid in impacted_containers:
+        for e in edges:
+            if e.get("type") == "membership" and e["to"] == cid:
+                impact_ids.append(e["from"])
     
     # Human labels for summary
     c_labels = []
