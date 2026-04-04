@@ -22,8 +22,7 @@
 		container: true,
 		port: true,
 		database: true,
-		table: true,
-		service_group: true
+		table: true
 	});
 
 	// Persistence
@@ -76,8 +75,9 @@
 
 				nodesView = new DataView(nodesDataSet, {
 					filter: (item: any) => {
-						const cat = item.group as keyof typeof visibleCategories;
-						return visibleCategories[cat] ?? true;
+						const group = item.group as string;
+						if (group === 'service_group') return visibleCategories.container;
+						return visibleCategories[group as keyof typeof visibleCategories] ?? true;
 					}
 				});
 
@@ -221,7 +221,8 @@
 		const originSet = new Set(impactData?.tables || (impactData?.table ? [impactData.table] : []));
 
 		const nodeUpdates = nodesDataSet.map((n: any) => {
-			const isVisible = visibleCategories[n.group as keyof typeof visibleCategories] ?? true;
+			let isVisible = visibleCategories[n.group as keyof typeof visibleCategories] ?? true;
+			if (n.group === 'service_group') isVisible = visibleCategories.container;
 			const isImpacted = impactData ? impactSet.has(n.id) : true;
 			const isOrigin = impactData ? originSet.has(n.id) : false;
 
@@ -259,8 +260,13 @@
 			const toNode = nodesDataSet.get(e.to);
 			if (!fromNode || !toNode) return e;
 
-			const fromVisible = visibleCategories[fromNode.group as keyof typeof visibleCategories] ?? true;
-			const toVisible = visibleCategories[toNode.group as keyof typeof visibleCategories] ?? true;
+			const getVis = (group: string) => {
+				if (group === 'service_group') return visibleCategories.container;
+				return visibleCategories[group as keyof typeof visibleCategories] ?? true;
+			};
+
+			const fromVisible = getVis(fromNode.group);
+			const toVisible = getVis(toNode.group);
 			const isImpacted = impactData ? impactSet.has(e.from) && impactSet.has(e.to) : true;
 
 			let hidden = !fromVisible || !toVisible;
@@ -268,7 +274,7 @@
 			let dashes = e.type === 'membership';
 
 			if (e.type === 'membership') {
-				opacity = 0.2;
+				opacity = 0.4;
 			}
 
 			if (impactData && !isImpacted) opacity = 0.05;
@@ -284,7 +290,7 @@
 							: e.type === 'provides'
 								? '#10b981'
 								: e.type === 'membership'
-									? '#475569'
+									? '#64748b'
 									: '#334155',
 					opacity
 				},
