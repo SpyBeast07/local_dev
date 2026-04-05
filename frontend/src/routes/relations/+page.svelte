@@ -527,6 +527,68 @@
 	</header>
 
 	<div class="flex-1 flex gap-6 min-h-0 relative">
+		<!-- Query Tracer (Joined to visualizer block) -->
+		<div
+			class="absolute top-0 right-20 -translate-y-1/2 z-50 w-[580px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1.5 rounded-2xl shadow-2xl flex items-center gap-2 transition-all {queryInput
+				? 'ring-4 ring-indigo-500/10'
+				: ''}"
+		>
+			<div
+				class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0 border border-indigo-500/5 group"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+					><path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2.5"
+						d="M13 10V3L4 14h7v7l9-11h-7z"
+					/></svg
+				>
+			</div>
+			<div class="flex-1 min-w-0">
+				<SqlEditor
+					bind:value={queryInput}
+					onRun={runTrace}
+					singleLine={true}
+					autocomplete={false}
+					placeholder="Trace SQL impact..."
+				/>
+			</div>
+			<button
+				onclick={(e) => { e.stopPropagation(); runTrace(); }}
+				disabled={isTracing || !queryInput}
+				class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 shadow-sm active:scale-95 shrink-0"
+			>
+				{#if isTracing}
+					<div
+						class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"
+					></div>
+				{:else}
+					Trace
+				{/if}
+			</button>
+			{#if impactData || traceData}
+				<button
+					onclick={(e) => {
+						e.stopPropagation();
+						queryInput = '';
+						resetHighlight();
+					}}
+					class="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-colors shrink-0"
+					aria-label="Reset view"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+						><path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2.5"
+							d="M6 18L18 6M6 6l12 12"
+						/></svg
+					>
+				</button>
+			{/if}
+		</div>
+
 		<div
 			class="relative flex-1 bg-white/50 dark:bg-slate-950/50 rounded-[2.5rem] p-4 border border-slate-200/60 dark:border-slate-800 shadow-inner overflow-hidden backdrop-blur-sm"
 		>
@@ -683,66 +745,6 @@
 
 			<div bind:this={container} class="w-full h-full rounded-[2rem] focus:outline-none"></div>
 
-			<div
-				class="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 w-[800px] bg-slate-900/95 backdrop-blur-2xl border border-slate-700/80 p-3 rounded-[1.8rem] shadow-[0_30px_50px_-15px_rgba(0,0,0,0.6)] flex items-center gap-4 transition-all {queryInput
-					? 'ring-4 ring-indigo-500/20'
-					: ''}"
-			>
-				<div
-					class="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0 border border-indigo-500/20 shadow-inner"
-				>
-					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2.5"
-							d="M13 10V3L4 14h7v7l9-11h-7z"
-						/></svg
-					>
-				</div>
-				<div class="flex-1 min-w-0">
-					<SqlEditor
-						bind:value={queryInput}
-						onRun={runTrace}
-						singleLine={true}
-						autocomplete={false}
-						placeholder="Trace SQL impact (e.g. SELECT * FROM users)..."
-					/>
-				</div>
-				<button
-					onclick={runTrace}
-					disabled={isTracing || !queryInput}
-					class="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all flex items-center gap-3 shadow-lg shadow-indigo-500/20 active:scale-95"
-				>
-					{#if isTracing}
-						<div
-							class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"
-						></div>
-						Tracing
-					{:else}
-						Trace Query
-					{/if}
-				</button>
-				{#if impactData || traceData}
-					<button
-						onclick={() => {
-							queryInput = '';
-							resetHighlight();
-						}}
-						class="w-12 h-12 rounded-2xl hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-colors"
-						aria-label="Reset view"
-					>
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M6 18L18 6M6 6l12 12"
-							/></svg
-						>
-					</button>
-				{/if}
-			</div>
 		</div>
 
 		{#if selectedNode || impactData || traceData}
