@@ -1,2 +1,34 @@
 @import "tailwindcss";
 @config "../tailwind.config.js";
+
+/* Global Layout Fixes */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    /* Prevent white background flash on overscroll (macOS/iOS) */
+    background-color: #020617; /* Slate-950 */
+    overscroll-behavior-y: none;
+}
+
+/* Ensure overscroll doesn't reveal a white surface on specific scroll containers */
+main, .overflow-y-auto {
+    overscroll-behavior-y: none;
+}
+
+/* Better scrollbar for content areas */
+:global(.custom-scrollbar::-webkit-scrollbar) {
+    width: 6px;
+    height: 6px;
+}
+:global(.custom-scrollbar::-webkit-scrollbar-track) {
+    background: transparent;
+}
+:global(.custom-scrollbar::-webkit-scrollbar-thumb) {
+    background: rgba(100, 116, 139, 0.2);
+    border-radius: 10px;
+}
+:global(.custom-scrollbar::-webkit-scrollbar-thumb:hover) {
+    background: rgba(99, 102, 241, 0.4);
+}
