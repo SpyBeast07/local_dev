@@ -1,11 +1,11 @@
 {
     "history": [
         {
-            "id": "hist_1775395492755",
-            "query": "SELECT * FROM users ",
-            "duration_ms": 21.54,
+            "id": "hist_1775398171251",
+            "query": "SELECT * FROM users",
+            "duration_ms": 7.3,
             "affected_rows": 10,
-            "timestamp": "2026-04-05 18:54:52",
+            "timestamp": "2026-04-05 19:39:31",
             "success": true,
             "error": null,
             "table_name": "users",
@@ -14,11 +14,11 @@
             "optimization_hints": []
         },
         {
-            "id": "hist_1775395492751",
-            "query": "SELECT * FROM users ",
-            "duration_ms": 12.29,
+            "id": "hist_1775398170390",
+            "query": "SELECT * FROM users",
+            "duration_ms": 7.93,
             "affected_rows": 10,
-            "timestamp": "2026-04-05 18:54:52",
+            "timestamp": "2026-04-05 19:39:30",
             "success": true,
             "error": null,
             "table_name": "users",
@@ -27,76 +27,11 @@
             "optimization_hints": []
         },
         {
-            "id": "hist_1775394422053",
-            "query": "SELECT * FROM orders;",
-            "duration_ms": 42.89,
-            "affected_rows": 15,
-            "timestamp": "2026-04-05 18:37:02",
-            "success": true,
-            "error": null,
-            "table_name": "orders",
-            "performance_tier": "FAST",
-            "explain_summary": "Seq Scan (Cost: 1.15) | 1 Seq Scans",
-            "optimization_hints": []
-        },
-        {
-            "id": "hist_1775394239689",
-            "query": "SELECT * FROM orders;",
-            "duration_ms": 12.56,
-            "affected_rows": 15,
-            "timestamp": "2026-04-05 18:33:59",
-            "success": true,
-            "error": null,
-            "table_name": "orders",
-            "performance_tier": "FAST",
-            "explain_summary": "Seq Scan (Cost: 1.15) | 1 Seq Scans",
-            "optimization_hints": []
-        },
-        {
-            "id": "hist_1775394071070",
-            "query": "SELECT * FROM users ",
-            "duration_ms": 9.65,
+            "id": "hist_1775398169083",
+            "query": "SELECT * FROM users",
+            "duration_ms": 7.19,
             "affected_rows": 10,
-            "timestamp": "2026-04-05 18:31:11",
-            "success": true,
-            "error": null,
-            "table_name": "users",
-            "performance_tier": "FAST",
-            "explain_summary": "Seq Scan (Cost: 1.1) | 1 Seq Scans",
-            "optimization_hints": []
-        },
-        {
-            "id": "hist_1775394070040",
-            "query": "SELECT * FROM users ",
-            "duration_ms": 31.71,
-            "affected_rows": 10,
-            "timestamp": "2026-04-05 18:31:10",
-            "success": true,
-            "error": null,
-            "table_name": "users",
-            "performance_tier": "FAST",
-            "explain_summary": "Seq Scan (Cost: 1.1) | 1 Seq Scans",
-            "optimization_hints": []
-        },
-        {
-            "id": "hist_1775394070038",
-            "query": "SELECT * FROM users ",
-            "duration_ms": 31.36,
-            "affected_rows": 10,
-            "timestamp": "2026-04-05 18:31:10",
-            "success": true,
-            "error": null,
-            "table_name": "users",
-            "performance_tier": "FAST",
-            "explain_summary": "Seq Scan (Cost: 1.1) | 1 Seq Scans",
-            "optimization_hints": []
-        },
-        {
-            "id": "hist_1775394069416",
-            "query": "SELECT * FROM users ",
-            "duration_ms": 11.32,
-            "affected_rows": 10,
-            "timestamp": "2026-04-05 18:31:09",
+            "timestamp": "2026-04-05 19:39:29",
             "success": true,
             "error": null,
             "table_name": "users",
@@ -105,19 +40,6 @@
             "optimization_hints": []
         }
     ],
-    "snippets": [
-        {
-            "id": "snip_1775395496386",
-            "name": "hehe",
-            "query": "SELECT * FROM users ",
-            "tags": [],
-            "is_favorite": false,
-            "created_at": "2026-04-05 18:54:56",
-            "last_used": "2026-04-05 18:54:56"
-        }
-    ],
-    "snapshots": [],
-    "preferences": {
-        "safe_mode": false
-    }
+    "snippets": [],
+    "snapshots": []
 }
