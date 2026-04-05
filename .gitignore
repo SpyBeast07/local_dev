@@ -39,4 +39,4 @@ node_modules/
 backend/config.json
 
 # Meta
-devbeast_meta.json
+backend/devbeast_meta.json
