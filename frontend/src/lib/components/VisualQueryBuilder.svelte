@@ -51,8 +51,6 @@
 	let selectedNodeId = $state<string | null>(null);
 	let limit = $state<number | null>(null);
 	let sorts = $state<SortConfig[]>([]);
-	let impactSummary = $state<any>(null);
-	let isAnalyzingImpact = $state(false);
 
 	const joinTypes = ['INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL JOIN'];
 	const operators = ['=', '>', '<', '>=', '<=', 'LIKE', 'IN', '!='];
@@ -113,11 +111,11 @@
 					solver: 'repulsion',
 					repulsion: { nodeDistance: 200, springLength: 150 }
 				},
-				interaction: {
-					hover: true,
-					multiselect: false,
-					navigationButtons: true
-				}
+					interaction: {
+						hover: true,
+						multiselect: false,
+						navigationButtons: false
+					}
 			};
 
 			network = new Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options);
@@ -370,40 +368,9 @@
 		selectedEdgeId = null;
 		limit = null;
 		sorts = [];
-		impactSummary = null;
 		generateSQL();
 	}
 
-	async function runImpactAnalysis() {
-		const nodes = nodesDataSet.get();
-		if (nodes.length === 0) return;
-		
-		isAnalyzingImpact = true;
-		impactSummary = null;
-		
-		try {
-			// Get the union of impacted IDs for all tables in the query
-			const tableIds = nodes.map(n => n.tableName);
-			const results = await Promise.all(
-				tableIds.map(id => axios.get(`http://127.0.0.1:8000/system/impact-analysis?table=${id}`))
-			);
-			
-			const allImpactIds = new Set<string>();
-			results.forEach(r => {
-				r.data.impact_ids.forEach((id: string) => allImpactIds.add(id));
-			});
-			
-			impactSummary = {
-				count: allImpactIds.size,
-				tables: tableIds.length,
-				timestamp: new Date().toLocaleTimeString()
-			};
-		} catch (err) {
-			console.error('Impact analysis failed:', err);
-		} finally {
-			isAnalyzingImpact = false;
-		}
-	}
 
 	function updateJoinType(type: string) {
 		if (selectedEdgeId) {
@@ -449,28 +416,10 @@
 		</div>
 		<div class="flex items-center gap-3">
 			<button 
-				onclick={resetQuery}
-				class="px-4 py-2.5 rounded-xl border border-rose-200 dark:border-rose-900/30 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 text-[10px] font-black uppercase tracking-widest transition-all"
-			>
-				Reset
-			</button>
-			<button 
 				onclick={onCancel}
 				class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 text-[10px] font-black uppercase tracking-widest transition-all"
 			>
 				Cancel
-			</button>
-			<button 
-				onclick={runImpactAnalysis}
-				disabled={nodesDataSet.length === 0 || isAnalyzingImpact}
-				class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50"
-			>
-				{#if isAnalyzingImpact}
-					<div class="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-				{:else}
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-				{/if}
-				Analyze Impact
 			</button>
 			<button 
 				onclick={() => onSendToEditor(generatedSql)}
@@ -484,32 +433,6 @@
 
 	<div class="flex-1 flex min-h-0 relative">
 		<!-- Impact Analysis Modal Overlay -->
-		{#if impactSummary}
-			<div class="absolute inset-x-0 bottom-0 z-50 p-6 animate-in slide-in-from-bottom-full duration-500">
-				<div class="mx-auto max-w-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 p-6 rounded-[2rem] shadow-2xl flex items-center justify-between">
-					<div class="flex items-center gap-6">
-						<div class="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20">
-							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-						</div>
-						<div>
-							<h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Impact Analysis Complete</h3>
-							<p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
-								{impactSummary.count} resources across {impactSummary.tables} tables affected
-							</p>
-						</div>
-					</div>
-					<div class="flex items-center gap-3">
-						<span class="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-4">Analyzed at {impactSummary.timestamp}</span>
-						<button 
-							onclick={() => impactSummary = null}
-							class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-widest transition-all"
-						>
-							Dismiss
-						</button>
-					</div>
-				</div>
-			</div>
-		{/if}
 
 		<!-- Sidebar: Tables -->
 		<div class="w-64 border-r border-slate-200/60 dark:border-slate-800 flex flex-col bg-slate-50/50 dark:bg-slate-950/20">

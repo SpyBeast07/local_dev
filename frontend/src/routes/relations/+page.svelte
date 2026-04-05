@@ -627,20 +627,29 @@
 							<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]"
 								>LEGEND</span
 							>
-							<button
-								onclick={resetFilters}
-								class="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-1"
-							>
-								<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-									><path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="3"
-										d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-									/></svg
+							<div class="flex items-center gap-3">
+								<button
+									onclick={() => network?.fit()}
+									class="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-1"
 								>
-								Reset
-							</button>
+									<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+									Fit
+								</button>
+								<button
+									onclick={resetFilters}
+									class="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-1"
+								>
+									<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+										><path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="3"
+											d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+										/></svg
+									>
+									Reset
+								</button>
+							</div>
 						</div>
 						<div class="grid grid-cols-2 gap-x-6 gap-y-3">
 							{#each [ { id: 'container', label: 'Container', color: 'bg-sky-500', shape: 'rounded-sm' }, { id: 'port', label: 'Port', color: 'bg-amber-500', shape: 'rounded-full' }, { id: 'database', label: 'Database', color: 'bg-emerald-500', shape: 'rounded-sm' }, { id: 'table', label: 'Table', color: 'bg-indigo-500', shape: 'rounded-sm' } ] as cat}
@@ -787,6 +796,17 @@
 				</div>
 
 				<div bind:this={container} class="w-full h-full rounded-[2rem] focus:outline-none"></div>
+
+				<!-- Graph Controls Overlay -->
+				<div class="absolute bottom-8 right-8 flex items-center gap-2 z-20">
+					<button 
+						onclick={() => network?.fit()}
+						class="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-500 hover:text-indigo-500 transition-all shadow-xl"
+						title="Fit view"
+					>
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+					</button>
+				</div>
 			</div>
 
 		{#if selectedNode || impactData || traceData}

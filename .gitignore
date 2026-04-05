@@ -37,3 +37,6 @@ node_modules/
 
 # Config
 backend/config.json
+
+# Meta
+devbeast_meta.json
