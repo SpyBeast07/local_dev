@@ -1,0 +1,385 @@
+{
+    "history": [
+        {
+            "id": "hist_1775390944670",
+            "query": "SELECT *\nFROM public.orders\nCROSS JOIN order_items",
+            "duration_ms": 24.81,
+            "affected_rows": 465,
+            "timestamp": "2026-04-05 17:39:04",
+            "success": true,
+            "error": null
+        },
+        {
+            "id": "hist_1775390887053",
+            "query": "SELECT * FROM users ",
+            "duration_ms": 11.71,
+            "affected_rows": 10,
+            "timestamp": "2026-04-05 17:38:07",
+            "success": true,
+            "error": null
+        },
+        {
+            "id": "hist_1775376966552",
+            "query": "-- Migration generated for newAND ",
+            "duration_ms": 9.17,
+            "affected_rows": 0,
+            "timestamp": "2026-04-05 13:46:06",
+            "success": false,
+            "error": "can't execute an empty query"
+        },
+        {
+            "id": "hist_1775376939205",
+            "query": "SELECT * FROM users;",
+            "duration_ms": 9.96,
+            "affected_rows": 10,
+            "timestamp": "2026-04-05 13:45:39",
+            "success": true,
+            "error": null
+        },
+        {
+            "id": "hist_1775376922570",
+            "query": "SELECT 1;",
+            "duration_ms": 8.02,
+            "affected_rows": 1,
+            "timestamp": "2026-04-05 13:45:22",
+            "success": true,
+            "error": null
+        },
+        {
+            "id": "hist_1775376825559",
+            "query": "SELECT * FROM users;",
+            "duration_ms": 20.29,
+            "affected_rows": 10,
+            "timestamp": "2026-04-05 13:43:45",
+            "success": true,
+            "error": null
+        },
+        {
+            "id": "hist_1775374708436",
+            "query": "SELECT 1;",
+            "duration_ms": 8.44,
+            "affected_rows": 1,
+            "timestamp": "2026-04-05 13:08:28",
+            "success": true,
+            "error": null
+        }
+    ],
+    "snippets": [
+        {
+            "id": "snip_1775390897078",
+            "name": "Test Snippet",
+            "query": "SELECT * FROM users ",
+            "tags": [],
+            "created_at": "2026-04-05 17:38:17"
+        }
+    ],
+    "snapshots": [
+        {
+            "id": "snap_1775376853822",
+            "name": "new",
+            "timestamp": "2026-04-05 13:44:13",
+            "schema": {
+                "public.order_items": [
+                    {
+                        "column": "id",
+                        "type": "integer",
+                        "nullable": false
+                    },
+                    {
+                        "column": "order_id",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    {
+                        "column": "product_id",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    {
+                        "column": "quantity",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    {
+                        "column": "price",
+                        "type": "numeric",
+                        "nullable": true
+                    },
+                    {
+                        "column": "metadata",
+                        "type": "json",
+                        "nullable": true
+                    },
+                    {
+                        "column": "created_at",
+                        "type": "timestamp without time zone",
+                        "nullable": true
+                    }
+                ],
+                "public.orders": [
+                    {
+                        "column": "id",
+                        "type": "integer",
+                        "nullable": false
+                    },
+                    {
+                        "column": "uuid",
+                        "type": "uuid",
+                        "nullable": true
+                    },
+                    {
+                        "column": "user_id",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    {
+                        "column": "status",
+                        "type": "text",
+                        "nullable": true
+                    },
+                    {
+                        "column": "total",
+                        "type": "numeric",
+                        "nullable": true
+                    },
+                    {
+                        "column": "is_paid",
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    {
+                        "column": "created_at",
+                        "type": "timestamp without time zone",
+                        "nullable": true
+                    },
+                    {
+                        "column": "updated_at",
+                        "type": "timestamp with time zone",
+                        "nullable": true
+                    },
+                    {
+                        "column": "order_date",
+                        "type": "date",
+                        "nullable": true
+                    },
+                    {
+                        "column": "notes",
+                        "type": "jsonb",
+                        "nullable": true
+                    }
+                ],
+                "public.payments": [
+                    {
+                        "column": "id",
+                        "type": "integer",
+                        "nullable": false
+                    },
+                    {
+                        "column": "uuid",
+                        "type": "uuid",
+                        "nullable": true
+                    },
+                    {
+                        "column": "order_id",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    {
+                        "column": "amount",
+                        "type": "numeric",
+                        "nullable": true
+                    },
+                    {
+                        "column": "fee",
+                        "type": "numeric",
+                        "nullable": true
+                    },
+                    {
+                        "column": "status",
+                        "type": "text",
+                        "nullable": true
+                    },
+                    {
+                        "column": "paid_at",
+                        "type": "timestamp with time zone",
+                        "nullable": true
+                    },
+                    {
+                        "column": "method",
+                        "type": "text",
+                        "nullable": true
+                    },
+                    {
+                        "column": "receipt",
+                        "type": "jsonb",
+                        "nullable": true
+                    },
+                    {
+                        "column": "raw",
+                        "type": "bytea",
+                        "nullable": true
+                    }
+                ],
+                "public.products": [
+                    {
+                        "column": "id",
+                        "type": "integer",
+                        "nullable": false
+                    },
+                    {
+                        "column": "uuid",
+                        "type": "uuid",
+                        "nullable": true
+                    },
+                    {
+                        "column": "name",
+                        "type": "text",
+                        "nullable": true
+                    },
+                    {
+                        "column": "price",
+                        "type": "numeric",
+                        "nullable": true
+                    },
+                    {
+                        "column": "discount",
+                        "type": "numeric",
+                        "nullable": true
+                    },
+                    {
+                        "column": "stock",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    {
+                        "column": "is_available",
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    {
+                        "column": "metadata",
+                        "type": "json",
+                        "nullable": true
+                    },
+                    {
+                        "column": "extra",
+                        "type": "jsonb",
+                        "nullable": true
+                    },
+                    {
+                        "column": "created_at",
+                        "type": "timestamp without time zone",
+                        "nullable": true
+                    },
+                    {
+                        "column": "updated_at",
+                        "type": "timestamp with time zone",
+                        "nullable": true
+                    },
+                    {
+                        "column": "launch_date",
+                        "type": "date",
+                        "nullable": true
+                    },
+                    {
+                        "column": "image",
+                        "type": "bytea",
+                        "nullable": true
+                    },
+                    {
+                        "column": "cost",
+                        "type": "money",
+                        "nullable": true
+                    }
+                ],
+                "public.users": [
+                    {
+                        "column": "id",
+                        "type": "integer",
+                        "nullable": false
+                    },
+                    {
+                        "column": "uuid",
+                        "type": "uuid",
+                        "nullable": true
+                    },
+                    {
+                        "column": "name",
+                        "type": "text",
+                        "nullable": true
+                    },
+                    {
+                        "column": "email",
+                        "type": "text",
+                        "nullable": true
+                    },
+                    {
+                        "column": "is_active",
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    {
+                        "column": "badge",
+                        "type": "text",
+                        "nullable": true
+                    },
+                    {
+                        "column": "profile",
+                        "type": "json",
+                        "nullable": true
+                    },
+                    {
+                        "column": "preferences",
+                        "type": "jsonb",
+                        "nullable": true
+                    },
+                    {
+                        "column": "created_at",
+                        "type": "timestamp without time zone",
+                        "nullable": true
+                    },
+                    {
+                        "column": "updated_at",
+                        "type": "timestamp with time zone",
+                        "nullable": true
+                    },
+                    {
+                        "column": "birth_date",
+                        "type": "date",
+                        "nullable": true
+                    },
+                    {
+                        "column": "balance",
+                        "type": "numeric",
+                        "nullable": true
+                    },
+                    {
+                        "column": "credit_limit",
+                        "type": "numeric",
+                        "nullable": true
+                    },
+                    {
+                        "column": "wallet",
+                        "type": "money",
+                        "nullable": true
+                    },
+                    {
+                        "column": "profile_pic",
+                        "type": "bytea",
+                        "nullable": true
+                    },
+                    {
+                        "column": "last_login",
+                        "type": "timestamp with time zone",
+                        "nullable": true
+                    },
+                    {
+                        "column": "nullable_field",
+                        "type": "text",
+                        "nullable": true
+                    }
+                ]
+            }
+        }
+    ]
+}

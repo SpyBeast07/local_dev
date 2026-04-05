@@ -2,7 +2,9 @@
 	import { onMount } from 'svelte';
 	import axios from 'axios';
 	import { fade } from 'svelte/transition';
+	import { page } from '$app/state';
 	import { schemaStore } from '$lib/stores/schemaStore';
+	import { workspaceStore } from '$lib/stores/workspaceStore';
 	import SqlEditor from '$lib/components/SqlEditor.svelte';
 
 	let tables = $state<string[]>([]);
@@ -31,6 +33,10 @@
 	let dbName = $state('postgres');
 	let typedConfirmation = $state('');
 
+	let showSnippetModal = $state(false);
+	let snippetName = $state('');
+	let snippetTags = $state('');
+
 	async function fetchDbConfig() {
 		try {
 			const res = await axios.get('http://127.0.0.1:8000/config/db');
@@ -43,6 +49,12 @@
 	onMount(() => {
 		fetchDbConfig();
 		schemaStore.fetchSchema();
+
+		// Handle Replay from Workspace
+		const sqlParam = page.url.searchParams.get('sql');
+		if (sqlParam) {
+			query = sqlParam;
+		}
 	});
 
 	function triggerQuery() {
@@ -244,6 +256,16 @@
 		}
 	}
 
+	function getErrorHint(error: string): string | null {
+		if (!error) return null;
+		if (error.includes('42703')) return 'Undefined Column: Typo discovered. Verify your column names against the schema metadata.';
+		if (error.includes('42P01')) return 'Undefined Table: The referenced relation does not exist. Ensure you are using "schema.table" syntax.';
+		if (error.includes('23505')) return 'Unique Violation: A record with this unique identifier already exists in the target array.';
+		if (error.includes('23503')) return 'Foreign Key Violation: You are referencing a non-existent parent or deleting a dependent child.';
+		if (error.includes('42601')) return 'Syntax Error: Structural anomaly detected in your SQL statement near the highlighted segment.';
+		return null;
+	}
+
 	onMount(async () => {
 		try {
 			const res = await axios.get('http://127.0.0.1:8000/db/tables');
@@ -254,6 +276,14 @@
 			loading = false;
 		}
 	});
+
+	async function saveSnippet() {
+		if (!snippetName || !query) return;
+		await workspaceStore.saveSnippet(snippetName, query, snippetTags.split(',').map(t => t.trim()).filter(t => t));
+		showSnippetModal = false;
+		snippetName = '';
+		snippetTags = '';
+	}
 
 	function clickOutside(node: any, callback: () => void) {
 		const handleClick = (e: MouseEvent) => {
@@ -450,9 +480,24 @@
 				class="mt-4 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-4 overflow-hidden"
 			>
 				<div class="flex items-center justify-between">
-					<h3 class="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
-						Execution Result
-					</h3>
+					<div class="flex items-center gap-4">
+						<h3 class="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
+							Execution Result
+						</h3>
+						{#if queryResult.execution_time_ms}
+							<span class="text-[9px] font-black text-indigo-500 uppercase tracking-widest px-2 py-0.5 bg-indigo-500/10 rounded-lg border border-indigo-500/20 shadow-sm animate-in fade-in duration-500">
+								Latency: {queryResult.execution_time_ms}ms
+							</span>
+						{/if}
+						{#if queryResult.success}
+							<button 
+								onclick={() => showSnippetModal = true}
+								class="text-[9px] font-black text-emerald-500 hover:text-emerald-400 uppercase tracking-widest px-2 py-0.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 transition-all active:scale-95"
+							>
+								+ Save Snippet
+							</button>
+						{/if}
+					</div>
 					<button
 						onclick={() => {
 							queryResult = null;
@@ -464,10 +509,21 @@
 				</div>
 
 				{#if !queryResult.success}
-					<div
-						class="bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono break-all leading-relaxed whitespace-pre-wrap"
-					>
-						{queryResult.error}
+					<div class="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+						<div
+							class="bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono break-all leading-relaxed whitespace-pre-wrap"
+						>
+							{queryResult.error}
+						</div>
+						
+						{#if getErrorHint(queryResult.error)}
+							<div class="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3">
+								<span class="text-lg">💡</span>
+								<p class="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest leading-relaxed">
+									{getErrorHint(queryResult.error)}
+								</p>
+							</div>
+						{/if}
 					</div>
 				{:else}
 					<!-- New Trace Summary Section -->
@@ -1147,6 +1203,68 @@
 		</div>
 	</div>
 {/if}
+
+	<!-- SAVE AS SNIPPET MODAL -->
+	{#if showSnippetModal}
+		<div
+			class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md"
+		>
+			<div
+				class="bg-white dark:bg-slate-950 border border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.1)] rounded-[2.5rem] p-10 max-w-md w-full flex flex-col gap-8 animate-in zoom-in-95 duration-200"
+			>
+				<div class="flex flex-col gap-2">
+					<h3 class="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">
+						Store <span class="text-emerald-500">Snippet</span>
+					</h3>
+					<p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Identify this logic for future use</p>
+				</div>
+
+				<div class="flex flex-col gap-5">
+					<div class="space-y-2">
+						<label for="snip_name" class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Logic Label</label>
+						<input 
+							id="snip_name"
+							type="text" 
+							placeholder="e.g. Fetch Active Subscriptions" 
+							bind:value={snippetName}
+							class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none"
+						/>
+					</div>
+					<div class="space-y-2">
+						<label for="snip_tags" class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tags (Comma Separated)</label>
+						<input 
+							id="snip_tags"
+							type="text" 
+							placeholder="billing, safety, automation" 
+							bind:value={snippetTags}
+							class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none font-mono"
+						/>
+					</div>
+				</div>
+
+				<div class="bg-slate-950 rounded-2xl p-5 border border-slate-800">
+					<span class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Captured SQL</span>
+					<pre class="text-[10px] font-mono text-slate-400 whitespace-pre-wrap line-clamp-3 italic opacity-60">" {query} "</pre>
+				</div>
+
+				<div class="flex gap-4 pt-2">
+					<button 
+						onclick={() => showSnippetModal = false}
+						class="flex-1 px-6 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+					>
+						Discard
+					</button>
+					<button 
+						onclick={saveSnippet}
+						disabled={!snippetName}
+						class="flex-1 px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+					>
+						Register Snippet
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 <style>
 	.custom-scrollbar::-webkit-scrollbar {

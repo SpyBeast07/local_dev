@@ -403,10 +403,17 @@ def get_relations():
     except Exception as e:
         return {"error": str(e)}
 
+import time
+import decimal
+import datetime
+import uuid
+from .meta import MetaService
+
 def execute_raw_query(query: str):
     if not query.strip():
         return {"success": False, "error": "Query cannot be empty."}
         
+    start_time = time.time()
     try:
         # Use with context managers to ensure connection and cursor are always closed
         with get_connection() as conn:
@@ -445,22 +452,101 @@ def execute_raw_query(query: str):
                         
                     data = []
                     for row in rows:
-                        # Use our de-duplicated 'columns' for the dictionary keys
                         mapped_row = dict(zip(columns, row))
                         sanitized_row = {k: _make_serializable(v) for k, v in mapped_row.items()}
                         data.append(sanitized_row)
 
-                
                 # Commit any data mutations
                 conn.commit()
+                
+                duration = (time.time() - start_time) * 1000
+                
+                # Persistence: Log success history
+                MetaService.add_history(query, duration, affected_rows, True)
                 
                 return {
                     "success": True,
                     "columns": columns,
                     "data": data,
                     "affected_rows": affected_rows,
-                    "is_truncated": is_truncated
+                    "is_truncated": is_truncated,
+                    "execution_time_ms": round(duration, 2)
                 }
+    except Exception as e:
+        duration = (time.time() - start_time) * 1000
+        # Persistence: Log error history
+        MetaService.add_history(query, duration, 0, False, str(e))
+        return {"success": False, "error": str(e), "execution_time_ms": round(duration, 2)}
+
+def get_roles_permissions():
+    """Fetches database roles and their associated table privileges."""
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                # Get Roles
+                cursor.execute("""
+                    SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin 
+                    FROM pg_roles
+                    WHERE rolname NOT LIKE 'pg_%'
+                    ORDER BY rolname;
+                """)
+                roles_raw = cursor.fetchall()
+                roles = []
+                for r in roles_raw:
+                    roles.append({
+                        "name": r[0],
+                        "is_superuser": r[1],
+                        "can_inherit": r[2],
+                        "can_create_role": r[3],
+                        "can_create_db": r[4],
+                        "can_login": r[5]
+                    })
+                
+                # Get Table Privileges
+                cursor.execute("""
+                    SELECT grantee, table_schema, table_name, privilege_type
+                    FROM information_schema.role_table_grants
+                    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+                    ORDER BY grantee, table_schema, table_name;
+                """)
+                privs_raw = cursor.fetchall()
+                privileges = []
+                for p in privs_raw:
+                    privileges.append({
+                        "grantee": p[0],
+                        "schema": p[1],
+                        "table": p[2],
+                        "type": p[3]
+                    })
+                
+                return {"success": True, "roles": roles, "privileges": privileges}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def get_schema_snapshot():
+    """Captures a structural snapshot of all user tables for diffing."""
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT table_schema, table_name, column_name, data_type, is_nullable
+                    FROM information_schema.columns
+                    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+                    ORDER BY table_schema, table_name, ordinal_position;
+                """)
+                rows = cursor.fetchall()
+                
+                snapshot = {}
+                for s, t, c, dt, n in rows:
+                    full_table = f"{s}.{t}"
+                    if full_table not in snapshot:
+                        snapshot[full_table] = []
+                    snapshot[full_table].append({
+                        "column": c,
+                        "type": dt,
+                        "nullable": n == "YES"
+                    })
+                return {"success": True, "snapshot": snapshot}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

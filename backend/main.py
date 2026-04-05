@@ -13,9 +13,10 @@ from services.docker import (
     get_dependency_graph, get_impact_analysis, trace_query
 )
 from services.ports import get_ports, kill_port_process
-from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config, truncate_tables, get_full_schema
+from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config, truncate_tables, get_full_schema, get_roles_permissions, get_schema_snapshot
 from services.backups import export_db, restore_db, export_table
 from services.seeding import run_seed_script
+from services.meta import MetaService
 
 load_dotenv()
 
@@ -177,6 +178,47 @@ class QueryPayload(BaseModel):
 @app.post("/db/query")
 def run_query(payload: QueryPayload):
     return execute_raw_query(payload.query)
+
+@app.get("/db/history")
+def get_query_history():
+    return {"success": True, "history": MetaService.get_history()}
+
+@app.get("/db/snippets")
+def get_snippets():
+    return {"success": True, "snippets": MetaService.get_snippets()}
+
+class SnippetPayload(BaseModel):
+    name: str
+    query: str
+    tags: list[str] = []
+
+@app.post("/db/snippets")
+def save_snippet(payload: SnippetPayload):
+    MetaService.save_snippet(payload.name, payload.query, payload.tags)
+    return {"success": True}
+
+@app.delete("/db/snippets/{snippet_id}")
+def delete_snippet(snippet_id: str):
+    MetaService.delete_snippet(snippet_id)
+    return {"success": True}
+
+@app.get("/db/roles-permissions")
+def db_roles_permissions():
+    return get_roles_permissions()
+
+class SnapshotPayload(BaseModel):
+    name: str
+
+@app.post("/db/schema/snapshot")
+def capture_snapshot(payload: SnapshotPayload):
+    res = get_schema_snapshot()
+    if res["success"]:
+        MetaService.save_snapshot(payload.name, res["snapshot"])
+    return res
+
+@app.get("/db/schema/snapshots")
+def get_snapshots():
+    return {"success": True, "snapshots": MetaService.get_snapshots()}
 
 @app.get("/db/backup")
 def get_db_backup(format: str = "sql"):

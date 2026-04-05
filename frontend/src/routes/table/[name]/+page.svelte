@@ -562,13 +562,49 @@
 						{/if}
 					</div>
 
-					<!-- Row counter + pagination pushed to the end -->
-					<div class="ml-auto flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
-						<span>Rows {offset + 1}–{Math.min(offset + pageSize, totalRows)} of {totalRows}</span>
-						<div class="flex items-center gap-1">
-							<button onclick={prevPage} disabled={currentPage === 1} aria-label="Previous Page" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-30 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" /></svg></button>
-							<span class="px-3">Pg {currentPage}</span>
-							<button onclick={nextPage} disabled={currentPage === totalPages} aria-label="Next Page" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-30 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg></button>
+					<!-- Page Size & Pagination -->
+					<div class="ml-auto flex items-center gap-6">
+						<div class="flex items-center gap-2">
+							<span class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Show</span>
+							<select 
+								bind:value={pageSize} 
+								onchange={() => { offset = 0; fetchData(); }}
+								class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-1 text-[10px] font-black text-slate-600 dark:text-slate-300 outline-none focus:border-indigo-500/50 transition-all cursor-pointer"
+							>
+								<option value={10}>10</option>
+								<option value={20}>20</option>
+								<option value={50}>50</option>
+								<option value={100}>100</option>
+							</select>
+						</div>
+
+						<div class="h-4 w-px bg-slate-200 dark:bg-slate-800"></div>
+
+						<div class="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+							<div class="flex items-center gap-1.5">
+								<button 
+									onclick={prevPage} 
+									disabled={currentPage === 1} 
+									aria-label="Previous Page"
+									class="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 disabled:opacity-20 flex items-center justify-center transition-all active:scale-90 shadow-sm"
+								>
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" /></svg>
+								</button>
+								
+								<div class="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-inner italic">
+									Page <span class="text-indigo-500">{currentPage}</span> / {totalPages}
+								</div>
+
+								<button 
+									onclick={nextPage} 
+									disabled={currentPage === totalPages} 
+									aria-label="Next Page"
+									class="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 disabled:opacity-20 flex items-center justify-center transition-all active:scale-90 shadow-sm"
+								>
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
+								</button>
+							</div>
+							<span class="opacity-40">{totalRows} total</span>
 						</div>
 					</div>
 				</div>
