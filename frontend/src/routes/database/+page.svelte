@@ -52,10 +52,43 @@
 
 		// Handle Replay from Workspace
 		const sqlParam = page.url.searchParams.get('sql');
+		const traceParam = page.url.searchParams.get('trace');
+
 		if (sqlParam) {
 			query = sqlParam;
+			if (traceParam === 'true') {
+				executeSQL();
+			}
 		}
 	});
+
+	// Global Keyboard Shortcuts
+	function handleKeydown(e: KeyboardEvent) {
+		const isMod = e.metaKey || e.ctrlKey;
+
+		if (isMod && e.key === 'Enter') {
+			e.preventDefault();
+			triggerQuery();
+		}
+
+		if (isMod && e.key.toLowerCase() === 's') {
+			e.preventDefault();
+			const cleanQuery = query.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+			const destructiveKeywords = /\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|RENAME|GRANT|REVOKE)\b/i;
+			const isDangerous = cleanQuery.match(destructiveKeywords);
+			
+			// Only allow save if not destructive or after confirmation? 
+			// Actually just open the modal if we have a successful result or just open it anyway.
+			if (query.trim()) {
+				showSnippetModal = true;
+			}
+		}
+
+		if (isMod && e.key.toLowerCase() === 'r') {
+			e.preventDefault();
+			executeSQL();
+		}
+	}
 
 	function triggerQuery() {
 		if (!query.trim()) return;
@@ -299,6 +332,8 @@
 		};
 	}
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="flex flex-col gap-10 pb-20">
 	<header class="flex flex-col gap-3">
@@ -608,6 +643,26 @@
 										Result set contains {queryResult.data?.length || 0} rows
 									</p>
 								</div>
+							</div>
+						</div>
+					{/if}
+
+					{#if queryResult.optimization_hints && queryResult.optimization_hints.length > 0}
+						<div class="mt-4 p-5 bg-amber-500/5 border border-amber-500/20 rounded-[2.5rem] shadow-sm animate-in slide-in-from-top-4 duration-700">
+							<div class="flex items-center gap-3 mb-4">
+								<span class="text-xl">💡</span>
+								<div>
+									<h4 class="text-[11px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-[0.2em] italic leading-none">Architectural Intelligence Hint</h4>
+									<p class="text-[9px] font-bold text-amber-600/60 dark:text-amber-500/40 uppercase tracking-widest mt-1 italic leading-none">Rule-based diagnostic derived from execution plan</p>
+								</div>
+							</div>
+							<div class="space-y-2">
+								{#each queryResult.optimization_hints as hint}
+									<div class="p-4 bg-white/50 dark:bg-amber-950/20 border border-amber-500/20 rounded-2xl flex items-start gap-3 transition-all hover:border-amber-500/40">
+										<div class="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shadow-lg shadow-amber-500/40"></div>
+										<p class="text-[11px] font-bold text-amber-700 dark:text-amber-300 leading-relaxed italic">{hint}</p>
+									</div>
+								{/each}
 							</div>
 						</div>
 					{/if}

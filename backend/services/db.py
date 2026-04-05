@@ -409,31 +409,109 @@ import datetime
 import uuid
 from .meta import MetaService
 
+def _parse_explain_plan(plan, insights=None):
+    """Recursively parses EXPLAIN JSON for deterministic patterns."""
+    if insights is None:
+        insights = {"seq_scans": [], "index_scans": [], "joins": [], "cost": 0}
+    
+    node_type = plan.get("Node Type")
+    table = plan.get("Relation Name")
+    schema = plan.get("Schema")
+    alias = plan.get("Alias")
+    filter_cond = plan.get("Filter") or plan.get("Index Cond")
+    
+    if node_type == "Seq Scan":
+        insights["seq_scans"].append({
+            "table": f"{schema}.{table}" if schema else table,
+            "alias": alias,
+            "filter": filter_cond,
+            "cost": plan.get("Total Cost")
+        })
+    elif node_type and "Index Scan" in node_type:
+        insights["index_scans"].append({
+            "table": f"{schema}.{table}" if schema else table,
+            "index": plan.get("Index Name"),
+            "cond": filter_cond
+        })
+    elif node_type and "Join" in node_type:
+        insights["joins"].append(node_type)
+        
+    if "Plans" in plan:
+        for subplan in plan["Plans"]:
+            _parse_explain_plan(subplan, insights)
+            
+    return insights
+
+def _generate_optimization_hints(insights):
+    """Deterministic rules-based optimizer hints."""
+    hints = []
+    
+    for scan in insights["seq_scans"]:
+        if scan["filter"]:
+            hints.append(f"Consider adding an index on '{scan['table']}' for columns used in filter: {scan['filter']}")
+            
+    if len(insights["seq_scans"]) > 0 and len(insights["index_scans"]) == 0:
+        if any(j for j in insights["joins"]):
+            hints.append("High Cost Joins detected without index usage. Verify join keys are indexed.")
+
+    return hints
+
 def execute_raw_query(query: str):
     if not query.strip():
         return {"success": False, "error": "Query cannot be empty."}
         
     start_time = time.time()
     try:
-        # Use with context managers to ensure connection and cursor are always closed
         with get_connection() as conn:
             with conn.cursor() as cursor:
-                # 1. Set a statement timeout for the session (10 seconds)
                 cursor.execute("SET statement_timeout = '10s';")
-                
-                # 2. Execute the user's query
                 cursor.execute(query)
                 
-                data = None
-                columns = None
+                duration = (time.time() - start_time) * 1000
+                performance_tier = "FAST"
+                if duration > 200:
+                    performance_tier = "SLOW"
+                elif duration > 100:
+                    performance_tier = "MEDIUM"
+
                 affected_rows = cursor.rowcount
                 is_truncated = False
                 
+                table_name = "Global"
+                q_lower = query.lower().strip()
+                try:
+                    if "from" in q_lower:
+                        table_name = q_lower.split("from")[1].strip().split()[0].replace('"', '').replace(";", "")
+                    elif "update" in q_lower:
+                        table_name = q_lower.split("update")[1].strip().split()[0].replace('"', '')
+                    elif "into" in q_lower:
+                        table_name = q_lower.split("into")[1].strip().split()[0].replace('"', '')
+                except:
+                    pass
+
+                explain_summary = None
+                optimization_hints = []
+                if q_lower.startswith("select"):
+                    try:
+                        # Use a separate cursor to avoid overwriting the main result set
+                        with conn.cursor() as assist_cursor:
+                            assist_cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
+                            plan_res = assist_cursor.fetchone()[0]
+                            if plan_res and len(plan_res) > 0:
+                                insights = _parse_explain_plan(plan_res[0]['Plan'])
+                                optimization_hints = _generate_optimization_hints(insights)
+                                
+                                root_node = plan_res[0]['Plan']
+                                explain_summary = f"{root_node['Node Type']} (Cost: {root_node['Total Cost']})"
+                                if insights["seq_scans"]:
+                                    explain_summary += f" | {len(insights['seq_scans'])} Seq Scans"
+                    except:
+                        pass
+
+                data = []
+                columns = []
                 if cursor.description:
                     raw_columns = [desc[0] for desc in cursor.description]
-                    
-                    # De-duplicate column names to prevent key collisions in JSON/dicts
-                    columns = []
                     seen_counts = {}
                     for col in raw_columns:
                         if col not in seen_counts:
@@ -443,26 +521,28 @@ def execute_raw_query(query: str):
                             seen_counts[col] += 1
                             columns.append(f"{col}_{seen_counts[col]}")
 
-                    # 3. Limit to 1000 rows to prevent memory exhaustion
                     rows = cursor.fetchmany(1001) 
-                    
                     if len(rows) > 1000:
                         is_truncated = True
                         rows = rows[:1000]
                         
-                    data = []
                     for row in rows:
                         mapped_row = dict(zip(columns, row))
                         sanitized_row = {k: _make_serializable(v) for k, v in mapped_row.items()}
                         data.append(sanitized_row)
 
-                # Commit any data mutations
                 conn.commit()
                 
-                duration = (time.time() - start_time) * 1000
-                
-                # Persistence: Log success history
-                MetaService.add_history(query, duration, affected_rows, True)
+                MetaService.add_history(
+                    query=query, 
+                    duration_ms=duration, 
+                    affected_rows=affected_rows if affected_rows != -1 else 0,
+                    success=True,
+                    table_name=table_name,
+                    performance_tier=performance_tier,
+                    explain_summary=explain_summary,
+                    optimization_hints=optimization_hints
+                )
                 
                 return {
                     "success": True,
@@ -470,12 +550,21 @@ def execute_raw_query(query: str):
                     "data": data,
                     "affected_rows": affected_rows,
                     "is_truncated": is_truncated,
-                    "execution_time_ms": round(duration, 2)
+                    "execution_time_ms": round(duration, 2),
+                    "performance_tier": performance_tier,
+                    "explain_summary": explain_summary,
+                    "optimization_hints": optimization_hints
                 }
     except Exception as e:
         duration = (time.time() - start_time) * 1000
-        # Persistence: Log error history
-        MetaService.add_history(query, duration, 0, False, str(e))
+        MetaService.add_history(
+            query=query, 
+            duration_ms=duration, 
+            affected_rows=0, 
+            success=False, 
+            error=str(e),
+            performance_tier="FAST"
+        )
         return {"success": False, "error": str(e), "execution_time_ms": round(duration, 2)}
 
 def get_roles_permissions():
@@ -550,6 +639,58 @@ def get_schema_snapshot():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+
+def execute_migration(query: str):
+    """Executes a batch of migration statements within a single transaction."""
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                # Set a longer timeout for migrations (30s)
+                cursor.execute("SET statement_timeout = '30s';")
+                # Split by semicolon then execute each
+                statements = [s.strip() for s in query.split(";") if s.strip()]
+                for stmt in statements:
+                    if not stmt.startswith("--"):
+                        cursor.execute(stmt)
+                conn.commit()
+                return {"success": True, "message": f"Successfully executed {len(statements)} migration steps."}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def get_active_queries():
+    """Monitors currently running queries on the database (Real-Time Awareness)."""
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 
+                        pid, 
+                        query, 
+                        now() - query_start AS duration, 
+                        state, 
+                        wait_event_type, 
+                        wait_event
+                    FROM pg_stat_activity 
+                    WHERE state != 'idle' 
+                      AND pid != pg_backend_pid()
+                      AND query NOT LIKE '%%pg_stat_activity%%'
+                    ORDER BY duration DESC;
+                """)
+                rows = cursor.fetchall()
+                active = []
+                for r in rows:
+                    # Convert duration to seconds for easier frontend handling
+                    dur_seconds = r[2].total_seconds() if r[2] else 0
+                    active.append({
+                        "pid": r[0],
+                        "query": r[1],
+                        "duration_s": round(dur_seconds, 2),
+                        "state": r[3],
+                        "wait_event": f"{r[4] or ''}: {r[5] or ''}".strip() or "None"
+                    })
+                return {"success": True, "active": active}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 def validate_db_config(config: dict):
     try:

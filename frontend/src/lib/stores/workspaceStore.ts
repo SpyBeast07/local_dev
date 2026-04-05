@@ -11,6 +11,24 @@ export interface HistoryEntry {
     timestamp: string;
     success: boolean;
     error?: string;
+    table_name?: string;
+    performance_tier?: 'FAST' | 'MEDIUM' | 'SLOW';
+    explain_summary?: string;
+    optimization_hints?: string[];
+}
+
+export interface ActiveQuery {
+    pid: number;
+    query: string;
+    duration_s: number;
+    state: string;
+    wait_event: string;
+}
+
+export interface AggregatedInsights {
+    slowest_queries: HistoryEntry[];
+    frequent_queries: { query: string; count: number }[];
+    impacted_tables: { table: string; activity: number; rows: number }[];
 }
 
 export interface Snippet {
@@ -18,7 +36,9 @@ export interface Snippet {
     name: string;
     query: string;
     tags: string[];
+    is_favorite: boolean;
     created_at: string;
+    last_used: string;
 }
 
 export interface Role {
@@ -43,6 +63,8 @@ interface WorkspaceState {
     roles: Role[];
     privileges: Privilege[];
     snapshots: any[];
+    insights: AggregatedInsights | null;
+    activeQueries: ActiveQuery[];
     isLoading: boolean;
     error: string | null;
 }
@@ -54,6 +76,8 @@ function createWorkspaceStore() {
         roles: [],
         privileges: [],
         snapshots: [],
+        insights: null,
+        activeQueries: [],
         isLoading: false,
         error: null
     });
@@ -63,11 +87,13 @@ function createWorkspaceStore() {
         async fetchAll() {
             update(s => ({ ...s, isLoading: true }));
             try {
-                const [hist, snip, roles, snaps] = await Promise.all([
+                const [hist, snip, roles, snaps, insights, active] = await Promise.all([
                     axios.get(`${API_BASE}/db/history`),
                     axios.get(`${API_BASE}/db/snippets`),
                     axios.get(`${API_BASE}/db/roles-permissions`),
-                    axios.get(`${API_BASE}/db/schema/snapshots`)
+                    axios.get(`${API_BASE}/db/schema/snapshots`),
+                    axios.get(`${API_BASE}/db/insights`),
+                    axios.get(`${API_BASE}/db/active-queries`)
                 ]);
 
                 set({
@@ -76,6 +102,8 @@ function createWorkspaceStore() {
                     roles: roles.data.roles || [],
                     privileges: roles.data.privileges || [],
                     snapshots: snaps.data.snapshots || [],
+                    insights: insights.data.insights || null,
+                    activeQueries: active.data.active || [],
                     isLoading: false,
                     error: null
                 });
@@ -83,10 +111,26 @@ function createWorkspaceStore() {
                 update(s => ({ ...s, isLoading: false, error: err.message }));
             }
         },
+        async fetchInsights() {
+            try {
+                const res = await axios.get(`${API_BASE}/db/insights`);
+                update(s => ({ ...s, insights: res.data.insights }));
+            } catch (err: any) {
+                console.error('Failed to fetch insights', err);
+            }
+        },
+        async fetchActiveQueries() {
+            try {
+                const res = await axios.get(`${API_BASE}/db/active-queries`);
+                update(s => ({ ...s, activeQueries: res.data.active }));
+            } catch (err: any) {
+                console.error('Failed to fetch active queries', err);
+            }
+        },
         async saveSnippet(name: string, query: string, tags: string[] = []) {
             try {
                 await axios.post(`${API_BASE}/db/snippets`, { name, query, tags });
-                this.fetchAll();
+                await this.fetchAll();
             } catch (err: any) {
                 update(s => ({ ...s, error: err.message }));
             }
@@ -94,7 +138,23 @@ function createWorkspaceStore() {
         async deleteSnippet(id: string) {
             try {
                 await axios.delete(`${API_BASE}/db/snippets/${id}`);
-                this.fetchAll();
+                await this.fetchAll();
+            } catch (err: any) {
+                update(s => ({ ...s, error: err.message }));
+            }
+        },
+        async toggleFavorite(id: string) {
+            try {
+                await axios.post(`${API_BASE}/db/snippets/${id}/favorite`);
+                await this.fetchAll();
+            } catch (err: any) {
+                update(s => ({ ...s, error: err.message }));
+            }
+        },
+        async trackSnippetUsage(id: string) {
+            try {
+                await axios.post(`${API_BASE}/db/snippets/${id}/track-usage`);
+                await this.fetchAll();
             } catch (err: any) {
                 update(s => ({ ...s, error: err.message }));
             }
@@ -102,7 +162,7 @@ function createWorkspaceStore() {
         async captureSnapshot(name: string) {
             try {
                 await axios.post(`${API_BASE}/db/schema/snapshot`, { name });
-                this.fetchAll();
+                await this.fetchAll();
             } catch (err: any) {
                 update(s => ({ ...s, error: err.message }));
             }

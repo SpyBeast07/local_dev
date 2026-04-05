@@ -5,37 +5,41 @@
 	import SnippetManager from './SnippetManager.svelte';
 	import RoleViewer from './RoleViewer.svelte';
 	import SchemaDiff from './SchemaDiff.svelte';
+	import InsightDashboard from './InsightDashboard.svelte';
+	import RealTimeMonitor from './RealTimeMonitor.svelte';
 
-	let activeTab = $state('history'); // history, snippets, schema, security
+	let activeTab = $state('intelligence'); // intelligence, awareness, audit, security, history, snippets
 
 	onMount(() => {
 		workspaceStore.fetchAll();
 	});
 
 	const tabs = [
-		{ id: 'history', label: 'Query History', icon: '📜' },
-		{ id: 'snippets', label: 'SQL Snippets', icon: '📝' },
-		{ id: 'schema', label: 'Schema Audit', icon: '🌓' },
-		{ id: 'security', label: 'Roles & Privs', icon: '🛡️' }
+		{ id: 'intelligence', label: 'Architecture', icon: '📡', tooltip: 'Aggregated Performance & Table Impact' },
+		{ id: 'awareness', label: 'Awareness', icon: '🛰️', tooltip: 'Live Database Activity (pg_stat_activity)' },
+		{ id: 'audit', label: 'Auditor', icon: '🌓', tooltip: 'Structural Comparative & Safe Migrations' },
+		{ id: 'security', label: 'Security', icon: '🛡️', tooltip: 'Role-Based Privileges & Grants' },
+		{ id: 'history', label: 'Registry', icon: '📜', tooltip: 'Execution Audit & Performance Logs' },
+		{ id: 'snippets', label: 'Library', icon: '📝', tooltip: 'SQL Utility Assets & Favorites' }
 	];
 </script>
 
-<div class="space-y-8 animate-in fade-in duration-700">
+<div class="space-y-8 animate-in fade-in duration-1000">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
 			<h1 class="text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">
-				Developer <span class="text-indigo-500">Workspace</span>
+				Workspace <span class="text-indigo-500">Intelligence</span>
 			</h1>
-			<p class="text-slate-500 dark:text-slate-400 text-sm font-medium mt-1">
-				Advanced database workflows, performance insights, and architectural auditing.
+			<p class="text-slate-500 dark:text-slate-400 text-sm font-bold mt-1 uppercase tracking-widest leading-none italic">
+				Deterministic diagnostics, architectural auditing, and real-time awareness.
 			</p>
 		</div>
 		<div class="flex items-center gap-3">
 			<button 
 				onclick={() => workspaceStore.fetchAll()}
 				disabled={$workspaceStore.isLoading}
-				class="px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:text-indigo-500 transition-all flex items-center gap-2 shadow-sm"
+				class="px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:text-indigo-500 transition-all flex items-center gap-2 shadow-sm active:scale-95"
 			>
 				{#if $workspaceStore.isLoading}
 					<div class="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -48,17 +52,18 @@
 	</div>
 
 	<!-- Main Tabbed Interface -->
-	<div class="flex flex-col h-[700px] bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden backdrop-blur-xl">
+	<div class="flex flex-col h-[750px] bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden backdrop-blur-3xl animate-in zoom-in-95 duration-700">
 		<!-- Tab Switcher -->
-		<div class="flex items-center p-3 gap-2 bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800">
+		<div class="flex items-center p-4 gap-2 bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar">
 			{#each tabs as tab}
 				<button 
 					onclick={() => activeTab = tab.id}
+					title={tab.tooltip}
 					class={[
-						"px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-3",
+						"px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-3 whitespace-nowrap",
 						activeTab === tab.id 
-							? "bg-white dark:bg-slate-800 text-indigo-500 shadow-lg shadow-indigo-500/10 border border-indigo-500/20" 
-							: "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30 border border-transparent"
+							? "bg-white dark:bg-slate-800 text-indigo-500 shadow-xl shadow-indigo-500/10 border border-indigo-500/20 scale-[1.02]" 
+							: "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800/30 border border-transparent"
 					].join(" ")}
 				>
 					<span class="text-sm">{tab.icon}</span>
@@ -68,15 +73,19 @@
 		</div>
 
 		<!-- Tab Content -->
-		<div class="flex-1 overflow-hidden">
-			{#if activeTab === 'history'}
-				<QueryHistory />
-			{:else if activeTab === 'snippets'}
-				<SnippetManager />
-			{:else if activeTab === 'schema'}
+		<div class="flex-1 overflow-hidden relative">
+			{#if activeTab === 'intelligence'}
+				<InsightDashboard />
+			{:else if activeTab === 'awareness'}
+				<RealTimeMonitor />
+			{:else if activeTab === 'audit'}
 				<SchemaDiff />
 			{:else if activeTab === 'security'}
 				<RoleViewer />
+			{:else if activeTab === 'history'}
+				<QueryHistory />
+			{:else if activeTab === 'snippets'}
+				<SnippetManager />
 			{/if}
 		</div>
 	</div>
@@ -96,5 +105,12 @@
 	}
 	:global(.custom-scrollbar::-webkit-scrollbar-thumb:hover) {
 		background: rgba(99, 102, 241, 0.3);
+	}
+	.no-scrollbar::-webkit-scrollbar {
+		display: none;
+	}
+	.no-scrollbar {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
 	}
 </style>

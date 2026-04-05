@@ -13,7 +13,7 @@ from services.docker import (
     get_dependency_graph, get_impact_analysis, trace_query
 )
 from services.ports import get_ports, kill_port_process
-from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config, truncate_tables, get_full_schema, get_roles_permissions, get_schema_snapshot
+from services.db import get_tables, get_table_data, get_relations, load_config, CONFIG_FILE, execute_raw_query, get_table_structure, insert_row, update_row, delete_row, validate_db_config, truncate_tables, get_full_schema, get_roles_permissions, get_schema_snapshot, get_active_queries, execute_migration
 from services.backups import export_db, restore_db, export_table
 from services.seeding import run_seed_script
 from services.meta import MetaService
@@ -179,9 +179,24 @@ class QueryPayload(BaseModel):
 def run_query(payload: QueryPayload):
     return execute_raw_query(payload.query)
 
+@app.post("/db/execute-migration")
+def run_migration(payload: QueryPayload):
+    """Executes a batch of structural changes (Safe Migration Layer)."""
+    return execute_migration(payload.query)
+
 @app.get("/db/history")
 def get_query_history():
     return {"success": True, "history": MetaService.get_history()}
+
+@app.get("/db/insights")
+def get_db_insights():
+    """Returns aggregated architectural insights (Aggregated History)."""
+    return {"success": True, "insights": MetaService.get_aggregated_insights()}
+
+@app.get("/db/active-queries")
+def get_active_queries_route():
+    """Returns currently running/active database queries (Real-Time Awareness)."""
+    return get_active_queries()
 
 @app.get("/db/snippets")
 def get_snippets():
@@ -200,6 +215,16 @@ def save_snippet(payload: SnippetPayload):
 @app.delete("/db/snippets/{snippet_id}")
 def delete_snippet(snippet_id: str):
     MetaService.delete_snippet(snippet_id)
+    return {"success": True}
+
+@app.post("/db/snippets/{snippet_id}/favorite")
+def snippet_favorite(snippet_id: str):
+    MetaService.toggle_snippet_favorite(snippet_id)
+    return {"success": True}
+
+@app.post("/db/snippets/{snippet_id}/track-usage")
+def snippet_usage(snippet_id: str):
+    MetaService.update_snippet_usage(snippet_id)
     return {"success": True}
 
 @app.get("/db/roles-permissions")
