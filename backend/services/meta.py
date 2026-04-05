@@ -12,7 +12,10 @@ class MetaService:
             return {
                 "history": [],
                 "snippets": [],
-                "snapshots": []
+                "snapshots": [],
+                "improvement_logs": [],
+                "narrative": [],
+                "preferences": {"safe_mode": True}
             }
         try:
             with open(META_FILE, "r") as f:

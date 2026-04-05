@@ -90,22 +90,6 @@
 		}
 	}
 
-	function triggerQuery() {
-		if (!query.trim()) return;
-
-		const cleanQuery = query.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-
-		const destructiveKeywords =
-			/\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|RENAME|GRANT|REVOKE)\b/i;
-		const isDangerous = cleanQuery.match(destructiveKeywords);
-
-		if (isDangerous) {
-			showConfirmModal = true;
-		} else {
-			executeSQL();
-		}
-	}
-
 	function confirmFirst() {
 		showConfirmModal = false;
 		showRootModal = true;
@@ -266,6 +250,12 @@
 		}
 	}
 
+	function triggerQuery() {
+		if (!query.trim()) return;
+		executeSQL();
+	}
+
+
 	async function executeSQL() {
 		queryLoading = true;
 		queryTrace = null;
@@ -368,11 +358,15 @@
 		class="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col gap-6 relative w-full max-w-full"
 	>
 		<div class="flex items-center justify-between">
-			<h2
-				class="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest italic flex items-center gap-2"
-			>
-				<span class="text-emerald-500">ROOT</span> Raw SQL Editor
-			</h2>
+			<div class="flex items-center gap-6">
+				<h2
+					class="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest italic flex items-center gap-2"
+				>
+					<span class="text-emerald-500">ROOT</span> Raw SQL Editor
+				</h2>
+			</div>
+
+
 			{#if queryLoading || backupLoading || restoreLoading}
 				<div
 					class="flex items-center gap-3 text-[10px] font-bold text-emerald-500 uppercase tracking-widest"
@@ -647,20 +641,45 @@
 						</div>
 					{/if}
 
+
 					{#if queryResult.optimization_hints && queryResult.optimization_hints.length > 0}
-						<div class="mt-4 p-5 bg-amber-500/5 border border-amber-500/20 rounded-[2.5rem] shadow-sm animate-in slide-in-from-top-4 duration-700">
-							<div class="flex items-center gap-3 mb-4">
-								<span class="text-xl">💡</span>
+						<div class="mt-4 p-6 bg-slate-950 border border-slate-800 rounded-[2.5rem] shadow-2xl animate-in slide-in-from-top-4 duration-700">
+							<div class="flex items-center gap-3 mb-6">
+								<div class="w-10 h-10 bg-amber-500/10 rounded-2xl flex items-center justify-center text-xl border border-amber-500/20">💡</div>
 								<div>
-									<h4 class="text-[11px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-[0.2em] italic leading-none">Architectural Intelligence Hint</h4>
-									<p class="text-[9px] font-bold text-amber-600/60 dark:text-amber-500/40 uppercase tracking-widest mt-1 italic leading-none">Rule-based diagnostic derived from execution plan</p>
+									<h4 class="text-[11px] font-black text-amber-500 uppercase tracking-[0.2em] italic leading-none">Optimization Insights</h4>
+									<p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1 italic leading-none">Architectural suggestions for performance tuning</p>
 								</div>
 							</div>
-							<div class="space-y-2">
+							<div class="grid grid-cols-1 gap-4">
 								{#each queryResult.optimization_hints as hint}
-									<div class="p-4 bg-white/50 dark:bg-amber-950/20 border border-amber-500/20 rounded-2xl flex items-start gap-3 transition-all hover:border-amber-500/40">
-										<div class="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shadow-lg shadow-amber-500/40"></div>
-										<p class="text-[11px] font-bold text-amber-700 dark:text-amber-300 leading-relaxed italic">{hint}</p>
+									<div class="p-5 bg-white/5 dark:bg-slate-900/50 border border-slate-800 rounded-3xl flex flex-col gap-4 group transition-all hover:border-amber-500/30">
+										<div class="flex items-start gap-4">
+											<div class="w-2 h-2 rounded-full mt-1.5 bg-amber-500 shadow-lg shadow-amber-500/40"></div>
+											<p class="text-[11px] font-bold text-slate-300 leading-relaxed italic">{hint}</p>
+										</div>
+										{#if hint.includes('CREATE INDEX') || hint.includes('ANALYZE')}
+											<div class="flex items-center gap-2 mt-2 pt-4 border-t border-slate-800">
+												<button 
+													onclick={() => {
+														const sql = hint.split(': ').pop();
+														navigator.clipboard.writeText(sql);
+													}}
+													class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+												>
+													Copy SQL
+												</button>
+												<button 
+													onclick={() => {
+														const sql = hint.split(': ').pop();
+														query = sql;
+													}}
+													class="px-4 py-2 bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white border border-amber-500/20 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+												>
+													Send to Editor
+												</button>
+											</div>
+										{/if}
 									</div>
 								{/each}
 							</div>

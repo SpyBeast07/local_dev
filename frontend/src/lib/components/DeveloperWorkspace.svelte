@@ -8,7 +8,7 @@
 	import InsightDashboard from './InsightDashboard.svelte';
 	import RealTimeMonitor from './RealTimeMonitor.svelte';
 
-	let activeTab = $state('intelligence'); // intelligence, awareness, audit, security, history, snippets
+	let activeTab = $state('intelligence'); // intelligence, audit, history, snippets
 
 	onMount(() => {
 		workspaceStore.fetchAll();
@@ -16,10 +16,8 @@
 
 	const tabs = [
 		{ id: 'intelligence', label: 'Architecture', icon: '📡', tooltip: 'Aggregated Performance & Table Impact' },
-		{ id: 'awareness', label: 'Awareness', icon: '🛰️', tooltip: 'Live Database Activity (pg_stat_activity)' },
 		{ id: 'audit', label: 'Auditor', icon: '🌓', tooltip: 'Structural Comparative & Safe Migrations' },
-		{ id: 'security', label: 'Security', icon: '🛡️', tooltip: 'Role-Based Privileges & Grants' },
-		{ id: 'history', label: 'Registry', icon: '📜', tooltip: 'Execution Audit & Performance Logs' },
+		{ id: 'history', label: 'History', icon: '📜', tooltip: 'Execution Audit & Performance Logs' },
 		{ id: 'snippets', label: 'Library', icon: '📝', tooltip: 'SQL Utility Assets & Favorites' }
 	];
 </script>

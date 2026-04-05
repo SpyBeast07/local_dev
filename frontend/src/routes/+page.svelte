@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import axios from "axios";
+	import { workspaceStore } from "$lib/stores/workspaceStore";
 
 	interface Container {
 		id: string;
@@ -37,6 +38,9 @@
 			ports = Array.isArray(pRes.data) ? pRes.data : [];
 			importantPorts = ports.filter(p => p.is_important);
 			tables = Array.isArray(tRes.data) ? tRes.data : [];
+			
+			// Initialize workspace store (history, snippets, etc.)
+			await workspaceStore.fetchAll();
 		} catch (err) {
 			console.error(err);
 		} finally {
@@ -73,7 +77,7 @@
 					<a href="/containers" class="text-[10px] font-black bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl border border-blue-100 dark:border-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all uppercase tracking-widest hover:scale-105">VIEW ALL</a>
 				</div>
 
-				<div class="flex flex-col gap-5">
+				<div class="flex flex-col gap-5 text-left">
 					{#each containers.slice(0, 3) as c}
 						<a href={`/container/${c.id}`} class="p-5 bg-slate-50/40 dark:bg-slate-950/40 rounded-3xl border border-slate-100 dark:border-slate-800/60 flex items-center justify-between group hover:border-blue-300 dark:hover:border-blue-800 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300">
 							<div>

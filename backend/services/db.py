@@ -441,18 +441,29 @@ def _parse_explain_plan(plan, insights=None):
             _parse_explain_plan(subplan, insights)
             
     return insights
+def _calculate_risk(query: str):
+    """Simple risk assessment for advisory only."""
+    q_lower = query.lower().strip()
+    if any(cmd in q_lower for cmd in ["drop", "truncate", "delete from", "alter table"]):
+        return "HIGH"
+    if any(cmd in q_lower for cmd in ["update", "insert into", "create index"]):
+        return "MEDIUM"
+    return "LOW"
 
 def _generate_optimization_hints(insights):
-    """Deterministic rules-based optimizer hints."""
+    """Manual, advisory-only optimization hints (Simplified)."""
     hints = []
     
     for scan in insights["seq_scans"]:
         if scan["filter"]:
-            hints.append(f"Consider adding an index on '{scan['table']}' for columns used in filter: {scan['filter']}")
+            table_name = scan["table"]
+            col = scan["filter"].split("=")[0].strip() if "=" in scan["filter"] else "id"
+            idx_name = f"idx_{table_name.split('.')[-1]}_{int(time.time()) % 1000}"
+            hints.append(f"Sequential Scan on '{table_name}'. Consider index on '{col}': CREATE INDEX CONCURRENTLY {idx_name} ON {table_name} ({col});")
             
     if len(insights["seq_scans"]) > 0 and len(insights["index_scans"]) == 0:
         if any(j for j in insights["joins"]):
-            hints.append("High Cost Joins detected without index usage. Verify join keys are indexed.")
+            hints.append(f"High Cost Joins on {insights['seq_scans'][0]['table']}. Suggest: ANALYZE {insights['seq_scans'][0]['table']};")
 
     return hints
 
@@ -508,6 +519,9 @@ def execute_raw_query(query: str):
                     except:
                         pass
 
+                risk_score = _calculate_risk(query)
+                
+                # Fetch data... (existing logic)
                 data = []
                 columns = []
                 if cursor.description:
@@ -553,7 +567,8 @@ def execute_raw_query(query: str):
                     "execution_time_ms": round(duration, 2),
                     "performance_tier": performance_tier,
                     "explain_summary": explain_summary,
-                    "optimization_hints": optimization_hints
+                    "optimization_hints": optimization_hints,
+                    "risk_score": risk_score
                 }
     except Exception as e:
         duration = (time.time() - start_time) * 1000
