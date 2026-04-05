@@ -527,225 +527,267 @@
 	</header>
 
 	<div class="flex-1 flex gap-6 min-h-0 relative">
-		<!-- Query Tracer (Joined to visualizer block) -->
+		<!-- Query Tracer -->
 		<div
 			class="absolute top-0 right-20 -translate-y-1/2 z-50 w-[580px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1.5 rounded-2xl shadow-2xl flex items-center gap-2 transition-all {queryInput
 				? 'ring-4 ring-indigo-500/10'
 				: ''}"
 		>
-			<div
-				class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0 border border-indigo-500/5 group"
-			>
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-					><path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2.5"
-						d="M13 10V3L4 14h7v7l9-11h-7z"
-					/></svg
-				>
-			</div>
-			<div class="flex-1 min-w-0">
-				<SqlEditor
-					bind:value={queryInput}
-					onRun={runTrace}
-					singleLine={true}
-					autocomplete={false}
-					placeholder="Trace SQL impact..."
-				/>
-			</div>
-			<button
-				onclick={(e) => { e.stopPropagation(); runTrace(); }}
-				disabled={isTracing || !queryInput}
-				class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 shadow-sm active:scale-95 shrink-0"
-			>
-				{#if isTracing}
-					<div
-						class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"
-					></div>
-				{:else}
-					Trace
-				{/if}
-			</button>
-			{#if impactData || traceData}
-				<button
-					onclick={(e) => {
-						e.stopPropagation();
-						queryInput = '';
-						resetHighlight();
-					}}
-					class="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-colors shrink-0"
-					aria-label="Reset view"
+				<div
+					class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0 border border-indigo-500/5 group"
 				>
 					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
 						><path
 							stroke-linecap="round"
 							stroke-linejoin="round"
 							stroke-width="2.5"
-							d="M6 18L18 6M6 6l12 12"
+							d="M13 10V3L4 14h7v7l9-11h-7z"
 						/></svg
 					>
-				</button>
-			{/if}
-		</div>
-
-		<div
-			class="relative flex-1 bg-white/50 dark:bg-slate-950/50 rounded-[2.5rem] p-4 border border-slate-200/60 dark:border-slate-800 shadow-inner overflow-hidden backdrop-blur-sm"
-		>
-			{#if loading}
-				<div
-					class="absolute inset-0 flex items-center justify-center bg-slate-950/80 z-20 rounded-[2.5rem] backdrop-blur-md"
+				</div>
+				<div class="flex-1 min-w-0">
+					<SqlEditor
+						bind:value={queryInput}
+						onRun={runTrace}
+						singleLine={true}
+						autocomplete={false}
+						placeholder="Trace SQL impact..."
+					/>
+				</div>
+				<button
+					onclick={(e) => {
+						e.stopPropagation();
+						runTrace();
+					}}
+					disabled={isTracing || !queryInput}
+					class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 shadow-sm active:scale-95 shrink-0"
 				>
-					<div
-						class="flex flex-col items-center gap-4 text-emerald-400 font-black animate-pulse uppercase tracking-wider text-sm"
-					>
+					{#if isTracing}
 						<div
-							class="w-10 h-10 border-4 border-current border-t-transparent rounded-full animate-spin"
+							class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"
 						></div>
-						Compiling Service Mesh...
-					</div>
-				</div>
-			{/if}
-
-			{#if error}
-				<div
-					class="absolute inset-0 flex flex-col items-center justify-center gap-4 text-rose-500 font-black"
-				>
-					<div class="text-4xl italic uppercase">Offline</div>
-					<p class="text-xs tracking-widest">{error}</p>
-				</div>
-			{/if}
-
-			<div
-				class="legend-container absolute top-8 left-8 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-6 py-5 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col gap-5 w-64 animate-in fade-in slide-in-from-left duration-500"
-			>
-				<div>
-					<div class="flex items-center justify-between mb-4">
-						<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]"
-							>LEGEND</span
-						>
-						<button
-							onclick={resetFilters}
-							class="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-1"
-						>
-							<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-								><path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="3"
-									d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-								/></svg
-							>
-							Reset
-						</button>
-					</div>
-					<div class="grid grid-cols-2 gap-x-6 gap-y-3">
-						{#each [ 
-							{ id: 'container', label: 'Container', color: 'bg-sky-500', shape: 'rounded-sm' }, 
-							{ id: 'port', label: 'Port', color: 'bg-amber-500', shape: 'rounded-full' }, 
-							{ id: 'database', label: 'Database', color: 'bg-emerald-500', shape: 'rounded-sm' }, 
-							{ id: 'table', label: 'Table', color: 'bg-indigo-500', shape: 'rounded-sm' } 
-						] as cat}
-							<div class="relative">
-								<div 
-									class="flex items-center gap-3 group {visibleCategories[cat.id as keyof typeof visibleCategories] ? '' : 'opacity-30 grayscale'}"
-								>
-									<button
-										onclick={(e) => { e.stopPropagation(); toggleCategory(cat.id as any); }}
-										ondblclick={() => isolateCategory(cat.id as any)}
-										class="w-3 h-3 {cat.shape} {cat.color} shadow-lg shadow-current/50 cursor-pointer hover:scale-125 transition-transform"
-										title="Toggle Category (Dbl-click to isolate)"
-									></button>
-									<button 
-										onclick={(e) => { e.stopPropagation(); toggleTooltip(cat.id); }}
-										class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none hover:text-indigo-500 transition-colors text-left truncate flex-1 tooltip-trigger"
-									>
-										{cat.label}
-									</button>
-								</div>
-
-								{#if activeTooltip === cat.id}
-									{@const nodes = nodesDataSet?.get({ filter: (n: any) => n.type === cat.id }) || []}
-									{@const allVisible = nodes.every((n: any) => !hiddenNodeIds[n.id])}
-									<!-- Tooltip Dialog -->
-									<div 
-										class="absolute top-full left-0 mt-3 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[100] p-4 animate-in fade-in zoom-in-95 duration-200"
-									>
-										<div class="flex items-center justify-between mb-4">
-											<span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">{cat.label}S</span>
-											<button 
-												onclick={(e) => { e.stopPropagation(); toggleGroupNodes(cat.id, !allVisible); }}
-												class="text-[8px] font-black uppercase px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-indigo-500 hover:text-white transition-all"
-											>
-												{allVisible ? 'Hide All' : 'Show All'}
-											</button>
-										</div>
-
-										<div class="max-h-48 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
-											{#if nodes.length === 0}
-												<div class="text-[9px] text-slate-400 italic py-2">No {cat.label.toLowerCase()}s found.</div>
-											{:else}
-												{#each nodes as node}
-													<button
-														onclick={(e) => {
-															e.stopPropagation();
-															toggleNode(node.id);
-															saveSettings();
-														}}
-														class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition-all {hiddenNodeIds[node.id] ? 'opacity-40' : 'bg-slate-100/50 dark:bg-white/5 shadow-sm'}"
-													>
-														<span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 truncate pr-2">{node.label}</span>
-														<div class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all {hiddenNodeIds[node.id] ? 'border-slate-300 dark:border-slate-700' : 'bg-indigo-500 border-indigo-500'}">
-															{#if !hiddenNodeIds[node.id]}
-																<svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"/></svg>
-															{/if}
-														</div>
-													</button>
-												{/each}
-											{/if}
-										</div>
-
-										<!-- Triangle Pointer -->
-										<div class="absolute -top-1.5 left-3 w-3 h-3 bg-white dark:bg-slate-900 border-t border-l border-slate-200 dark:border-slate-800 rotate-45"></div>
-									</div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				</div>
-
-				<div class="h-px bg-slate-200 dark:bg-slate-800"></div>
-
-				<div>
-					<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block"
-						>Presets</span
+					{:else}
+						Trace
+					{/if}
+				</button>
+				{#if impactData || traceData}
+					<button
+						onclick={(e) => {
+							e.stopPropagation();
+							queryInput = '';
+							resetHighlight();
+						}}
+						class="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 transition-colors shrink-0"
+						aria-label="Reset view"
 					>
-					<div class="flex flex-wrap gap-2">
-						<button
-							onclick={infraView}
-							class="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500 dark:hover:bg-indigo-600 text-slate-600 dark:text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all"
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2.5"
+								d="M6 18L18 6M6 6l12 12"
+							/></svg
 						>
-							Infra
-						</button>
-						<button
-							onclick={dataView}
-							class="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500 dark:hover:bg-indigo-600 text-slate-600 dark:text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all"
-						>
-							Data
-						</button>
-						<button
-							onclick={fullView}
-							class="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500 dark:hover:bg-indigo-600 text-slate-600 dark:text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all"
-						>
-							Full
-						</button>
-					</div>
-				</div>
+					</button>
+				{/if}
 			</div>
 
-			<div bind:this={container} class="w-full h-full rounded-[2rem] focus:outline-none"></div>
+			<div
+				class="relative flex-1 bg-white/50 dark:bg-slate-950/50 rounded-[2.5rem] p-4 border border-slate-200/60 dark:border-slate-800 shadow-inner overflow-hidden backdrop-blur-sm"
+			>
+				{#if loading}
+					<div
+						class="absolute inset-0 flex items-center justify-center bg-slate-950/80 z-20 rounded-[2.5rem] backdrop-blur-md"
+					>
+						<div
+							class="flex flex-col items-center gap-4 text-emerald-400 font-black animate-pulse uppercase tracking-wider text-sm"
+						>
+							<div
+								class="w-10 h-10 border-4 border-current border-t-transparent rounded-full animate-spin"
+							></div>
+							Compiling Service Mesh...
+						</div>
+					</div>
+				{/if}
 
-		</div>
+				{#if error}
+					<div
+						class="absolute inset-0 flex flex-col items-center justify-center gap-4 text-rose-500 font-black"
+					>
+						<div class="text-4xl italic uppercase">Offline</div>
+						<p class="text-xs tracking-widest">{error}</p>
+					</div>
+				{/if}
+
+				<div
+					class="legend-container absolute top-8 left-8 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-6 py-5 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col gap-5 w-64 animate-in fade-in slide-in-from-left duration-500"
+				>
+					<div>
+						<div class="flex items-center justify-between mb-4">
+							<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]"
+								>LEGEND</span
+							>
+							<button
+								onclick={resetFilters}
+								class="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-1"
+							>
+								<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+									><path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="3"
+										d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+									/></svg
+								>
+								Reset
+							</button>
+						</div>
+						<div class="grid grid-cols-2 gap-x-6 gap-y-3">
+							{#each [ { id: 'container', label: 'Container', color: 'bg-sky-500', shape: 'rounded-sm' }, { id: 'port', label: 'Port', color: 'bg-amber-500', shape: 'rounded-full' }, { id: 'database', label: 'Database', color: 'bg-emerald-500', shape: 'rounded-sm' }, { id: 'table', label: 'Table', color: 'bg-indigo-500', shape: 'rounded-sm' } ] as cat}
+								<div class="relative">
+									<div
+										class="flex items-center gap-3 group {visibleCategories[
+											cat.id as keyof typeof visibleCategories
+										]
+											? ''
+											: 'opacity-30 grayscale'}"
+									>
+										<button
+											onclick={(e) => {
+												e.stopPropagation();
+												toggleCategory(cat.id as any);
+											}}
+											ondblclick={() => isolateCategory(cat.id as any)}
+											class="w-3 h-3 {cat.shape} {cat.color} shadow-lg shadow-current/50 cursor-pointer hover:scale-125 transition-transform"
+											title="Toggle Category (Dbl-click to isolate)"
+										></button>
+										<button
+											onclick={(e) => {
+												e.stopPropagation();
+												toggleTooltip(cat.id);
+											}}
+											class="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-none hover:text-indigo-500 transition-colors text-left truncate flex-1 tooltip-trigger"
+										>
+											{cat.label}
+										</button>
+									</div>
+
+									{#if activeTooltip === cat.id}
+										{@const nodes =
+											nodesDataSet?.get({ filter: (n: any) => n.type === cat.id }) || []}
+										{@const allVisible = nodes.every((n: any) => !hiddenNodeIds[n.id])}
+										<!-- Tooltip Dialog -->
+										<div
+											class="absolute top-full left-0 mt-3 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[100] p-4 animate-in fade-in zoom-in-95 duration-200"
+										>
+											<div class="flex items-center justify-between mb-4">
+												<span
+													class="text-[9px] font-black text-slate-400 uppercase tracking-widest"
+													>{cat.label}S</span
+												>
+												<button
+													onclick={(e) => {
+														e.stopPropagation();
+														toggleGroupNodes(cat.id, !allVisible);
+													}}
+													class="text-[8px] font-black uppercase px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-indigo-500 hover:text-white transition-all"
+												>
+													{allVisible ? 'Hide All' : 'Show All'}
+												</button>
+											</div>
+
+											<div class="max-h-48 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+												{#if nodes.length === 0}
+													<div class="text-[9px] text-slate-400 italic py-2">
+														No {cat.label.toLowerCase()}s found.
+													</div>
+												{:else}
+													{#each nodes as node}
+														<button
+															onclick={(e) => {
+																e.stopPropagation();
+																toggleNode(node.id);
+																saveSettings();
+															}}
+															class="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition-all {hiddenNodeIds[
+																node.id
+															]
+																? 'opacity-40'
+																: 'bg-slate-100/50 dark:bg-white/5 shadow-sm'}"
+														>
+															<span
+																class="text-[10px] font-bold text-slate-600 dark:text-slate-300 truncate pr-2"
+																>{node.label}</span
+															>
+															<div
+																class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all {hiddenNodeIds[
+																	node.id
+																]
+																	? 'border-slate-300 dark:border-slate-700'
+																	: 'bg-indigo-500 border-indigo-500'}"
+															>
+																{#if !hiddenNodeIds[node.id]}
+																	<svg
+																		class="w-2.5 h-2.5 text-white"
+																		fill="none"
+																		stroke="currentColor"
+																		viewBox="0 0 24 24"
+																		><path
+																			stroke-linecap="round"
+																			stroke-linejoin="round"
+																			stroke-width="4"
+																			d="M5 13l4 4L19 7"
+																		/></svg
+																	>
+																{/if}
+															</div>
+														</button>
+													{/each}
+												{/if}
+											</div>
+
+											<!-- Triangle Pointer -->
+											<div
+												class="absolute -top-1.5 left-3 w-3 h-3 bg-white dark:bg-slate-900 border-t border-l border-slate-200 dark:border-slate-800 rotate-45"
+											></div>
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+
+					<div class="h-px bg-slate-200 dark:bg-slate-800"></div>
+
+					<div>
+						<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block"
+							>Presets</span
+						>
+						<div class="flex flex-wrap gap-2">
+							<button
+								onclick={infraView}
+								class="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500 dark:hover:bg-indigo-600 text-slate-600 dark:text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all"
+							>
+								Infra
+							</button>
+							<button
+								onclick={dataView}
+								class="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500 dark:hover:bg-indigo-600 text-slate-600 dark:text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all"
+							>
+								Data
+							</button>
+							<button
+								onclick={fullView}
+								class="px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500 dark:hover:bg-indigo-600 text-slate-600 dark:text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-widest transition-all"
+							>
+								Full
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<div bind:this={container} class="w-full h-full rounded-[2rem] focus:outline-none"></div>
+			</div>
 
 		{#if selectedNode || impactData || traceData}
 			<div

@@ -1,6 +1,13 @@
 import { writable } from 'svelte/store';
 import axios from 'axios';
 
+export interface RelationMetadata {
+	source_table: string;
+	source_column: string;
+	target_table: string;
+	target_column: string;
+}
+
 export interface SchemaMetadata {
 	[tableName: string]: string[];
 }
@@ -8,11 +15,13 @@ export interface SchemaMetadata {
 function createSchemaStore() {
 	const { subscribe, set, update } = writable<{
 		metadata: SchemaMetadata;
+		relations: RelationMetadata[];
 		loading: boolean;
 		error: string | null;
 		lastUpdated: number | null;
 	}>({
 		metadata: {},
+		relations: [],
 		loading: false,
 		error: null,
 		lastUpdated: null
@@ -26,6 +35,7 @@ function createSchemaStore() {
 			if (res.data.success) {
 				set({
 					metadata: res.data.schema,
+					relations: res.data.relations || [],
 					loading: false,
 					error: null,
 					lastUpdated: Date.now()

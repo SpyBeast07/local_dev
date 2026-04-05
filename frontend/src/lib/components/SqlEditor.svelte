@@ -18,6 +18,7 @@
 		onRun = () => {},
 		singleLine = false,
 		autocomplete = true,
+		readOnly = false,
 		height = singleLine ? '64px' : '180px'
 	} = $props();
 

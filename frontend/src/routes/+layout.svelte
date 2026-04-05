@@ -162,6 +162,13 @@
 					{/if}
 				</a>
 
+				<a href="/query-builder" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/query-builder') ? 'bg-slate-800 border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-800/50 hover:border-slate-800'}" title="Query Builder">
+					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/query-builder') ? 'bg-indigo-500/20 shadow-lg shadow-indigo-500/20' : 'bg-slate-900 group-hover:bg-indigo-500/10'}">🧩</span>
+					{#if !isCollapsed}
+						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/query-builder') ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}">Query Builder</span>
+					{/if}
+				</a>
+
 				<a href="/config" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border mt-6 {isActive('/config') ? 'bg-slate-800 border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-800/50 hover:border-slate-800'}" title="Settings">
 					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:rotate-90 {isActive('/config') ? 'bg-cyan-500/20 shadow-lg shadow-cyan-500/20' : 'bg-slate-900 group-hover:bg-cyan-500/10'}">⚙️</span>
 					{#if !isCollapsed}

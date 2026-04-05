@@ -87,7 +87,8 @@ def get_full_schema():
                 schema_map[full_table] = []
             schema_map[full_table].append(column)
             
-        return {"success": True, "schema": schema_map}
+        relations = get_relations()
+        return {"success": True, "schema": schema_map, "relations": relations}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

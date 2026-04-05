@@ -114,7 +114,7 @@ uvicorn main:app --reload
 ### 2. Start the Frontend Application
 ```bash
 cd frontend
-npm install  # Resolves CodeMirror 6 and visualization dependencies
+npm install
 npm run dev
 ```
 *Note: Available at `http://localhost:5173`.*
