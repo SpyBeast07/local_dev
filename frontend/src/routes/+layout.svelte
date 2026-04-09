@@ -65,8 +65,8 @@
 			</button>
 
 			<div class="flex items-center gap-4 group cursor-default mb-10 overflow-hidden">
-				<div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg shadow-indigo-500/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shrink-0">
-					🚀
+				<div class="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/10 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shrink-0 overflow-hidden border border-slate-800">
+					<img src="/logo.png" alt="DevBeast Logo" class="w-full h-full object-cover" />
 				</div>
 				{#if !isCollapsed}
 					<div class="flex flex-col animate-in fade-in slide-in-from-left duration-300">
