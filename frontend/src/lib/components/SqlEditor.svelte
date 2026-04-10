@@ -19,6 +19,7 @@
 		singleLine = false,
 		autocomplete = true,
 		readOnly = false,
+		lang = 'sql',
 		height = singleLine ? '64px' : '180px'
 	} = $props();
 
@@ -156,8 +157,8 @@
 
 	onMount(() => {
 		const extensions = [
-			sql({
-				schema: $schemaStore.metadata, // Built-in schema support for deep parsing
+			lang === 'json' ? jsonLang() : sql({
+				schema: $schemaStore.metadata,
 				upperCaseKeywords: true
 			}),
 			...(autocomplete ? [autocompletion({ override: [customCompletions] })] : []),

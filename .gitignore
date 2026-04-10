@@ -40,3 +40,6 @@ backend/config.json
 
 # Meta
 backend/devbeast_meta.json
+
+# Storage Config
+backend/sources.json

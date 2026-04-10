@@ -141,6 +141,20 @@
 					{/if}
 				</a>
 
+				<!-- STORAGE -->
+				{#if !isCollapsed}
+					<p class="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-2 px-3 mt-6 animate-in fade-in duration-300">Storage</p>
+				{:else}
+					<div class="h-px bg-slate-900 my-4 px-3"></div>
+				{/if}
+
+				<a href="/sources" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/sources') ? 'bg-slate-800 border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-800/50 hover:border-slate-800'}" title="Object Storage">
+					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/sources') ? 'bg-blue-500/20 shadow-lg shadow-blue-500/20' : 'bg-slate-900 group-hover:bg-blue-500/10'}">📦</span>
+					{#if !isCollapsed}
+						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/sources') ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}">Object Storage</span>
+					{/if}
+				</a>
+
 				<!-- DATABASE -->
 				{#if !isCollapsed}
 					<p class="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-2 px-3 mt-6 animate-in fade-in duration-300">Database</p>

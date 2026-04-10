@@ -546,6 +546,7 @@
 											<button 
 												onclick={() => removeFilter(node.id, idx)}
 												class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+												aria-label="Remove filter"
 											>
 												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
 											</button>
@@ -647,7 +648,7 @@
 
 									<div class="flex flex-col gap-3">
 										<div class="flex items-center justify-between">
-											<label class="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">Order By</label>
+											<span class="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1">Order By</span>
 											<button 
 												onclick={() => { sorts = [...sorts, { column: '', direction: 'ASC' }]; generateSQL(); }}
 												class="text-[9px] font-black text-indigo-500 hover:text-indigo-400 uppercase tracking-widest"
@@ -675,6 +676,7 @@
 													<button 
 														onclick={() => { sorts = sorts.filter((_, i) => i !== idx); generateSQL(); }}
 														class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all"
+														aria-label="Remove sort"
 													>
 														<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
 													</button>

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, UploadFile, File, Query, Form
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -17,6 +17,7 @@ from services.db import get_tables, get_table_data, get_relations, load_config, 
 from services.backups import export_db, restore_db, export_table
 from services.seeding import run_seed_script
 from services.meta import MetaService
+from services.storage import StorageService
 
 load_dotenv()
 
@@ -28,6 +29,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"]
 )
 
 
@@ -327,3 +329,109 @@ async def update_db_config(request: Request):
             status_code=400,
             content={"success": False, "error": str(e)}
         )
+
+# --- STORAGE ENDPOINTS ---
+
+@app.get("/sources")
+def get_sources():
+    return StorageService.get_sources()
+
+class SourcePayload(BaseModel):
+    name: str
+    endpoint: str
+    access_key: str
+    secret_key: str
+    region: str = "us-east-1"
+
+@app.post("/sources")
+def add_source(payload: SourcePayload):
+    return StorageService.add_source(
+        payload.name, payload.endpoint, payload.access_key, payload.secret_key, payload.region
+    )
+
+@app.delete("/sources/{source_id}")
+def delete_source(source_id: str):
+    return StorageService.delete_source(source_id)
+
+import traceback
+
+@app.post("/sources/{source_id}/test")
+def test_source(source_id: str):
+    try:
+        StorageService.list_buckets(source_id)
+        return {"success": True, "message": "Connection successful"}
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
+
+@app.get("/storage/detect")
+def detect_storage():
+    return StorageService.detect_local_storage()
+
+@app.get("/storage/{source_id}/buckets")
+def list_buckets(source_id: str):
+    try:
+        return StorageService.list_buckets(source_id)
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
+
+class BucketPayload(BaseModel):
+    name: str
+
+@app.post("/storage/{source_id}/buckets")
+def create_bucket(source_id: str, payload: BucketPayload):
+    try:
+        return StorageService.create_bucket(source_id, payload.name)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
+
+@app.delete("/storage/{source_id}/buckets/{bucket_name}")
+def delete_bucket(source_id: str, bucket_name: str):
+    try:
+        return StorageService.delete_bucket(source_id, bucket_name)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
+
+@app.get("/storage/{source_id}/buckets/{bucket_name}/objects")
+def list_objects(source_id: str, bucket_name: str, prefix: str = ""):
+    try:
+        return StorageService.list_objects(source_id, bucket_name, prefix)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
+
+@app.post("/storage/{source_id}/buckets/{bucket_name}/upload")
+async def upload_object(source_id: str, bucket_name: str, file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        return StorageService.upload_object(source_id, bucket_name, content, file.filename)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
+
+@app.delete("/storage/{source_id}/buckets/{bucket_name}/objects/{object_name:path}")
+def delete_object(source_id: str, bucket_name: str, object_name: str):
+    try:
+        print(f"TRACING: Deleting {object_name} from {bucket_name}")
+        return StorageService.delete_object(source_id, bucket_name, object_name)
+    except Exception as e:
+        print(f"ERROR: {str(e)}")
+        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
+
+@app.get("/storage/{source_id}/buckets/{bucket_name}/download/{object_name:path}")
+def download_object(source_id: str, bucket_name: str, object_name: str):
+    try:
+        url = StorageService.get_presigned_url(source_id, bucket_name, object_name, download=True)
+        return RedirectResponse(url=url, status_code=307)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
+
+@app.get("/storage/{source_id}/buckets/{bucket_name}/preview/{object_name:path}")
+def preview_object(source_id: str, bucket_name: str, object_name: str):
+    try:
+        content, content_type = StorageService.get_object(source_id, bucket_name, object_name)
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type=content_type
+        )
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})

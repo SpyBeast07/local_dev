@@ -1,0 +1,31 @@
+INFO:     Will watch for changes in these directories: ['/Users/kushagra/Documents/code/local_dev_UI/backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [15370] using StatReload
+INFO:     Started server process [15374]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:55100 - "GET /storage/89ad6c83-1be4-4974-9d59-49f5c6cd7233/buckets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55100 - "GET /storage/89ad6c83-1be4-4974-9d59-49f5c6cd7233/buckets/lms-files/objects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55154 - "GET /storage/89ad6c83-1be4-4974-9d59-49f5c6cd7233/buckets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55154 - "GET /storage/89ad6c83-1be4-4974-9d59-49f5c6cd7233/buckets/lms-files/objects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55154 - "GET /storage/89ad6c83-1be4-4974-9d59-49f5c6cd7233/buckets/lms-files/download/SOFTWARE%20SERVICES%20AGREEMENT.pdf HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55225 - "GET /containers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55226 - "GET /ports HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55227 - "GET /db/tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55227 - "GET /db/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55226 - "GET /db/snippets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55225 - "GET /db/schema/snapshots HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55230 - "GET /db/insights HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55230 - "GET /ports HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55230 - "OPTIONS /ports/kill HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55230 - "POST /ports/kill HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55230 - "GET /ports HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55230 - "POST /ports/kill HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55230 - "GET /ports HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55230 - "POST /ports/kill HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55231 - "POST /ports/kill HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55231 - "GET /ports HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15374]
