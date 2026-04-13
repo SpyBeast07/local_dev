@@ -8,6 +8,8 @@
 	import Modal from "$lib/components/common/Modal.svelte";
 
 	let config = $state({
+		db_type: "postgres",
+		db_file: "",
 		db_host: "",
 		db_port: "",
 		db_user: "",
@@ -141,21 +143,53 @@
 						</div>
 						<div>
 							<h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic leading-none">Database Identity</h2>
-							<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 block">PostgreSQL Gateway Profile</p>
+							<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 block">Connection Profile</p>
 						</div>
 					</div>
 				</div>
 
 				<form class="space-y-6" onsubmit={(e) => { e.preventDefault(); saveConfig(); }}>
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-						<InputField id="db_host" label="Host Address" bind:value={config.db_host} placeholder="localhost" mono />
-						<InputField id="db_port" label="Traffic Port" bind:value={config.db_port} placeholder="5432" mono />
-						<div class="md:col-span-2">
-							<InputField id="db_name" label="Target Cluster / DB Name" bind:value={config.db_name} placeholder="postgres" mono />
-						</div>
-						<InputField id="db_user" label="Authentication User" bind:value={config.db_user} placeholder="postgres" mono />
-						<InputField id="db_password" label="Authentication Core" type="password" bind:value={config.db_password} placeholder="••••••••" mono />
+					<!-- TABS FOR DIALECT -->
+					<div class="flex bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-xl w-full">
+						<button 
+							type="button"
+							onclick={() => config.db_type = 'postgres'}
+							class="flex-1 py-2.5 text-[10px] uppercase tracking-widest font-black transition-all rounded-lg {config.db_type === 'postgres' ? 'bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
+						>
+							PostgreSQL Server
+						</button>
+						<button 
+							type="button"
+							onclick={() => config.db_type = 'sqlite'}
+							class="flex-1 py-2.5 text-[10px] uppercase tracking-widest font-black transition-all rounded-lg {config.db_type === 'sqlite' ? 'bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}"
+						>
+							SQLite Local File
+						</button>
 					</div>
+
+					{#if config.db_type === 'postgres'}
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-200">
+							<InputField id="db_host" label="Host Address" bind:value={config.db_host} placeholder="localhost" mono />
+							<InputField id="db_port" label="Traffic Port" bind:value={config.db_port} placeholder="5432" mono />
+							<div class="md:col-span-2">
+								<InputField id="db_name" label="Target Cluster / DB Name" bind:value={config.db_name} placeholder="postgres" mono />
+							</div>
+							<InputField id="db_user" label="Authentication User" bind:value={config.db_user} placeholder="postgres" mono />
+							<InputField id="db_password" label="Authentication Core" type="password" bind:value={config.db_password} placeholder="••••••••" mono />
+						</div>
+					{:else}
+						<div class="grid grid-cols-1 gap-6 animate-in fade-in zoom-in-95 duration-200">
+							<InputField id="db_file" label="Absolute Path to .db File" bind:value={config.db_file} placeholder="/Users/username/project/database.sqlite" mono />
+							
+							<div class="px-5 py-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl flex items-start gap-4">
+								<div class="text-amber-500 mt-0.5">⚠️</div>
+								<div>
+									<p class="text-xs font-bold text-amber-800 dark:text-amber-500 uppercase tracking-widest">Local Target Warning</p>
+									<p class="text-[10px] mt-1 text-amber-700 dark:text-amber-600 font-medium leading-relaxed">Use the exact absolute path to your local working database. The DevBeast UI will immediately sync and execute queries securely via this file handler.</p>
+								</div>
+							</div>
+						</div>
+					{/if}
 
 					<div class="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
 						<Button type="submit" loading={saving} variant="cyan" size="lg">

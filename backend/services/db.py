@@ -1,4 +1,5 @@
 import psycopg2
+import sqlite3
 import os
 import json
 from dotenv import load_dotenv
@@ -10,6 +11,8 @@ CONFIG_FILE = "config.json"
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         default_config = {
+            "db_type": os.getenv("DB_TYPE", "postgres"),
+            "db_file": os.getenv("DB_FILE", ""),
             "db_host": os.getenv("DB_HOST", "localhost"),
             "db_port": os.getenv("DB_PORT", "5432"),
             "db_user": os.getenv("DB_USER", "postgres"),
@@ -21,10 +24,20 @@ def load_config():
         return default_config
         
     with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
+        conf = json.load(f)
+        if "db_type" not in conf: conf["db_type"] = "postgres"
+        if "db_file" not in conf: conf["db_file"] = ""
+        return conf
 
 def get_connection():
     config = load_config()
+    if config.get("db_type") == "sqlite":
+        # Check if file exists, raise exception if not to avoid creating accidental files
+        db_file = config.get("db_file", "")
+        if not os.path.exists(db_file):
+            raise Exception(f"SQLite file not found at: {db_file}")
+        return sqlite3.connect(db_file)
+        
     return psycopg2.connect(
         host=config["db_host"],
         port=config["db_port"],
@@ -35,8 +48,16 @@ def get_connection():
 
 def get_tables():
     try:
+        config = load_config()
         conn = get_connection()
         cursor = conn.cursor()
+
+        if config.get("db_type") == "sqlite":
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;")
+            tables = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return [row[0] for row in tables]
 
         cursor.execute("""
             SELECT table_schema, table_name
@@ -66,9 +87,25 @@ def _parse_table_ref(table_ref: str):
 def get_full_schema():
     """Fetches all tables and their columns in a single dictionary for autocomplete caching."""
     try:
+        config = load_config()
         conn = get_connection()
         cursor = conn.cursor()
         
+        if config.get("db_type") == "sqlite":
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+            tables = [r[0] for r in cursor.fetchall()]
+            
+            schema_map = {}
+            for table in tables:
+                cursor.execute(f"PRAGMA table_info('{table}')")
+                cols = [r[1] for r in cursor.fetchall()]
+                schema_map[table] = cols
+                
+            relations = get_relations()
+            cursor.close()
+            conn.close()
+            return {"success": True, "schema": schema_map, "relations": relations}
+            
         cursor.execute("""
             SELECT table_schema, table_name, column_name
             FROM information_schema.columns
@@ -94,9 +131,32 @@ def get_full_schema():
 
 def get_table_structure(table_name: str):
     try:
+        config = load_config()
         schema, bare_table = _parse_table_ref(table_name)
         conn = get_connection()
         cursor = conn.cursor()
+
+        if config.get("db_type") == "sqlite":
+            cursor.execute(f"PRAGMA table_info('{bare_table}')")
+            cols_info = cursor.fetchall()
+            
+            cursor.execute(f"PRAGMA foreign_key_list('{bare_table}')")
+            fks_info = cursor.fetchall()
+            fk_columns = {fk[3]: f"{fk[2]}({fk[4]})" for fk in fks_info}
+            
+            columns = []
+            for col in cols_info:
+                columns.append({
+                    "name": col[1],
+                    "type": col[2],
+                    "nullable": col[3] == 0,
+                    "default": col[4],
+                    "is_primary": col[5] > 0,
+                    "foreign_key": fk_columns.get(col[1], None)
+                })
+            cursor.close()
+            conn.close()
+            return {"success": True, "columns": columns}
 
         # Get Primary Keys
         cursor.execute("""
@@ -158,20 +218,25 @@ def get_table_structure(table_name: str):
 
 def get_table_data(table_name: str, limit: int = 20, offset: int = 0, sort_col: str = None, sort_dir: str = "asc"):
     try:
+        config = load_config()
+        is_sqlite = config.get("db_type") == "sqlite"
         schema, bare_table = _parse_table_ref(table_name)
-        qualified = f'"{schema}"."{bare_table}"'
+        qualified = f'"{bare_table}"' if is_sqlite else f'"{schema}"."{bare_table}"'
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Safely query column names to prevent SQL injection in sort_col
-        cursor.execute("""
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = %s
-              AND table_schema = %s;
-        """, (bare_table, schema))
+        if is_sqlite:
+            cursor.execute(f"PRAGMA table_info('{bare_table}')")
+            valid_columns = {col[1] for col in cursor.fetchall()}
+        else:
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = %s
+                  AND table_schema = %s;
+            """, (bare_table, schema))
+            valid_columns = {col[0] for col in cursor.fetchall()}
 
-        valid_columns = {col[0] for col in cursor.fetchall()}
         if not valid_columns:
             return {"error": "Table not found or has no columns"}
 
@@ -186,7 +251,8 @@ def get_table_data(table_name: str, limit: int = 20, offset: int = 0, sort_col: 
         total_rows = cursor.fetchone()[0]
 
         # Fetch Data
-        query = f"SELECT * FROM {qualified} {order_clause} LIMIT %s OFFSET %s;"
+        placeholder = "?" if is_sqlite else "%s"
+        query = f"SELECT * FROM {qualified} {order_clause} LIMIT {placeholder} OFFSET {placeholder};"
         cursor.execute(query, (limit, offset))
         
         rows = cursor.fetchall()
@@ -217,22 +283,33 @@ def get_table_data(table_name: str, limit: int = 20, offset: int = 0, sort_col: 
 def truncate_tables():
     """Truncates all user tables in the public schema and restarts identities."""
     try:
+        config = load_config()
+        is_sqlite = config.get("db_type") == "sqlite"
         tables = get_tables()
         if isinstance(tables, dict) and "error" in tables:
             return tables
             
-        with get_connection() as conn:
-            with conn.cursor() as cursor:
-                # 1. Truncate all tables in a single command for efficiency
-                # Restart identities for clean testing state
-                # Use CASCADE to handle FK constraints
-                table_list = ", ".join([f'"{_parse_table_ref(t)[0]}"."{_parse_table_ref(t)[1]}"' for t in tables])
-                if not table_list:
-                    return {"success": True, "message": "No tables detected for truncation."}
-                
-                query = f"TRUNCATE TABLE {table_list} RESTART IDENTITY CASCADE;"
-                cursor.execute(query)
-                conn.commit()
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        if is_sqlite:
+            for t in tables:
+                cursor.execute(f'DELETE FROM "{t}";')
+                try:
+                    cursor.execute(f"DELETE FROM sqlite_sequence WHERE name='{t}';")
+                except:
+                    pass
+        else:
+            table_list = ", ".join([f'"{_parse_table_ref(t)[0]}"."{_parse_table_ref(t)[1]}"' for t in tables])
+            if not table_list:
+                return {"success": True, "message": "No tables detected for truncation."}
+            
+            query = f"TRUNCATE TABLE {table_list} RESTART IDENTITY CASCADE;"
+            cursor.execute(query)
+            
+        conn.commit()
+        cursor.close()
+        conn.close()
                 
         return {"success": True, "message": f"Truncated {len(tables)} tables successfully."}
     except Exception as e:
@@ -242,11 +319,11 @@ def insert_row(table_name: str, payload: dict):
     if not payload:
         return {"success": False, "error": "Empty payload injected."}
     try:
+        config = load_config()
+        is_sqlite = config.get("db_type") == "sqlite"
         conn = get_connection()
         cursor = conn.cursor()
         
-        # Filter out empty strings to allow Postgres defaults (like SERIAL) to trigger
-        # Also stringify dicts/lists for psycopg2 adaptation
         filtered_payload = {}
         for k, v in payload.items():
             if v == "":
@@ -263,9 +340,11 @@ def insert_row(table_name: str, payload: dict):
         values = list(filtered_payload.values())
         
         schema, bare_table = _parse_table_ref(table_name)
-        qualified = f'"{schema}"."{bare_table}"'
+        qualified = f'"{bare_table}"' if is_sqlite else f'"{schema}"."{bare_table}"'
         col_string = ", ".join([f'"{c}"' for c in columns])
-        val_placeholders = ", ".join(["%s"] * len(values))
+        
+        placeholder = "?" if is_sqlite else "%s"
+        val_placeholders = ", ".join([placeholder] * len(values))
 
         query = f"INSERT INTO {qualified} ({col_string}) VALUES ({val_placeholders});"
         
@@ -284,33 +363,33 @@ def update_row(table_name: str, primary_keys: dict, payload: dict):
     if not payload:
         return {"success": False, "error": "Empty payload injected."}
     try:
+        config = load_config()
+        is_sqlite = config.get("db_type") == "sqlite"
         conn = get_connection()
         cursor = conn.cursor()
         
         set_cols = []
         values = []
+        placeholder = "?" if is_sqlite else "%s"
+        
         for k, v in payload.items():
-            # If front-end passes empty string for an existing row edit, assume they meant NULL
             if v == "":
                 v = None
-            
-            # Stringify dicts/lists for psycopg2 adaptation
             if isinstance(v, (dict, list)):
                 v = json.dumps(v)
                 
-            set_cols.append(f'"{k}" = %s')
+            set_cols.append(f'"{k}" = {placeholder}')
             values.append(v)
             
         where_cols = []
         for k, v in primary_keys.items():
-            # Stringify dicts/lists for psycopg2 adaptation if PK is JSON
             if isinstance(v, (dict, list)):
                 v = json.dumps(v)
-            where_cols.append(f'"{k}" = %s')
+            where_cols.append(f'"{k}" = {placeholder}')
             values.append(v)
             
         schema, bare_table = _parse_table_ref(table_name)
-        qualified = f'"{schema}"."{bare_table}"'
+        qualified = f'"{bare_table}"' if is_sqlite else f'"{schema}"."{bare_table}"'
         set_string = ", ".join(set_cols)
         where_string = " AND ".join(where_cols)
 
@@ -335,17 +414,21 @@ def delete_row(table_name: str, primary_keys: dict):
         return {"success": False, "error": "No primary keys provided for DELETE."}
         
     try:
+        config = load_config()
+        is_sqlite = config.get("db_type") == "sqlite"
         conn = get_connection()
         cursor = conn.cursor()
         
         where_cols = []
         values = []
+        placeholder = "?" if is_sqlite else "%s"
+        
         for k, v in primary_keys.items():
-            where_cols.append(f'"{k}" = %s')
+            where_cols.append(f'"{k}" = {placeholder}')
             values.append(v)
             
         schema, bare_table = _parse_table_ref(table_name)
-        qualified = f'"{schema}"."{bare_table}"'
+        qualified = f'"{bare_table}"' if is_sqlite else f'"{schema}"."{bare_table}"'
         where_string = " AND ".join(where_cols)
 
         query = f"DELETE FROM {qualified} WHERE {where_string};"
@@ -367,8 +450,28 @@ def delete_row(table_name: str, primary_keys: dict):
 
 def get_relations():
     try:
+        config = load_config()
         conn = get_connection()
         cursor = conn.cursor()
+
+        if config.get("db_type") == "sqlite":
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+            tables = [r[0] for r in cursor.fetchall()]
+            
+            relations = []
+            for table in tables:
+                cursor.execute(f"PRAGMA foreign_key_list('{table}')")
+                fks = cursor.fetchall()
+                for fk in fks:
+                    relations.append({
+                        "source_table": table,
+                        "source_column": fk[3],
+                        "target_table": fk[2],
+                        "target_column": fk[4]
+                    })
+            cursor.close()
+            conn.close()
+            return relations
 
         cursor.execute("""
             SELECT
@@ -473,9 +576,12 @@ def execute_raw_query(query: str):
         
     start_time = time.time()
     try:
+        config = load_config()
+        is_sqlite = config.get("db_type") == "sqlite"
         with get_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SET statement_timeout = '10s';")
+                if not is_sqlite:
+                    cursor.execute("SET statement_timeout = '10s';")
                 cursor.execute(query)
                 
                 duration = (time.time() - start_time) * 1000
@@ -502,7 +608,7 @@ def execute_raw_query(query: str):
 
                 explain_summary = None
                 optimization_hints = []
-                if q_lower.startswith("select"):
+                if q_lower.startswith("select") and not is_sqlite:
                     try:
                         # Use a separate cursor to avoid overwriting the main result set
                         with conn.cursor() as assist_cursor:
@@ -585,51 +691,61 @@ def execute_raw_query(query: str):
 def get_roles_permissions():
     """Fetches database roles and their associated table privileges."""
     try:
-        with get_connection() as conn:
-            with conn.cursor() as cursor:
-                # Get Roles
-                cursor.execute("""
-                    SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin 
-                    FROM pg_roles
-                    WHERE rolname NOT LIKE 'pg_%'
-                    ORDER BY rolname;
-                """)
-                roles_raw = cursor.fetchall()
-                roles = []
-                for r in roles_raw:
-                    roles.append({
-                        "name": r[0],
-                        "is_superuser": r[1],
-                        "can_inherit": r[2],
-                        "can_create_role": r[3],
-                        "can_create_db": r[4],
-                        "can_login": r[5]
-                    })
-                
-                # Get Table Privileges
-                cursor.execute("""
-                    SELECT grantee, table_schema, table_name, privilege_type
-                    FROM information_schema.role_table_grants
-                    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-                    ORDER BY grantee, table_schema, table_name;
-                """)
-                privs_raw = cursor.fetchall()
-                privileges = []
-                for p in privs_raw:
-                    privileges.append({
-                        "grantee": p[0],
-                        "schema": p[1],
-                        "table": p[2],
-                        "type": p[3]
-                    })
-                
-                return {"success": True, "roles": roles, "privileges": privileges}
+        config = load_config()
+        if config.get("db_type") == "sqlite":
+            return {"success": True, "roles": [], "privileges": []}
+            
+        conn = get_connection()
+        cursor = conn.cursor()
+        # Get Roles
+        cursor.execute("""
+            SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin 
+            FROM pg_roles
+            WHERE rolname NOT LIKE 'pg_%'
+            ORDER BY rolname;
+        """)
+        roles_raw = cursor.fetchall()
+        roles = []
+        for r in roles_raw:
+            roles.append({
+                "name": r[0],
+                "is_superuser": r[1],
+                "can_inherit": r[2],
+                "can_create_role": r[3],
+                "can_create_db": r[4],
+                "can_login": r[5]
+            })
+        
+        # Get Table Privileges
+        cursor.execute("""
+            SELECT grantee, table_schema, table_name, privilege_type
+            FROM information_schema.role_table_grants
+            WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+            ORDER BY grantee, table_schema, table_name;
+        """)
+        privs_raw = cursor.fetchall()
+        privileges = []
+        for p in privs_raw:
+            privileges.append({
+                "grantee": p[0],
+                "schema": p[1],
+                "table": p[2],
+                "type": p[3]
+            })
+        cursor.close()
+        conn.close()
+        
+        return {"success": True, "roles": roles, "privileges": privileges}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 def get_schema_snapshot():
     """Captures a structural snapshot of all user tables for diffing."""
     try:
+        config = load_config()
+        if config.get("db_type") == "sqlite":
+            return {"success": True, "snapshot": {}} # Simplified for SQLite
+            
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
@@ -658,10 +774,13 @@ def get_schema_snapshot():
 def execute_migration(query: str):
     """Executes a batch of migration statements within a single transaction."""
     try:
+        config = load_config()
+        is_sqlite = config.get("db_type") == "sqlite"
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 # Set a longer timeout for migrations (30s)
-                cursor.execute("SET statement_timeout = '30s';")
+                if not is_sqlite:
+                    cursor.execute("SET statement_timeout = '30s';")
                 # Split by semicolon then execute each
                 statements = [s.strip() for s in query.split(";") if s.strip()]
                 for stmt in statements:
@@ -675,6 +794,10 @@ def execute_migration(query: str):
 def get_active_queries():
     """Monitors currently running queries on the database (Real-Time Awareness)."""
     try:
+        config = load_config()
+        if config.get("db_type") == "sqlite":
+            return {"success": True, "active": []} # SQLite doesn't surface pg_stat_activity
+            
         with get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
@@ -709,6 +832,14 @@ def get_active_queries():
 
 def validate_db_config(config: dict):
     try:
+        if config.get("db_type") == "sqlite":
+            db_file = config.get("db_file", "")
+            if not os.path.exists(db_file):
+                raise Exception(f"SQLite file not found at path: {db_file}")
+            conn = sqlite3.connect(db_file)
+            conn.close()
+            return True
+            
         conn = psycopg2.connect(
             host=config.get("db_host"),
             port=config.get("db_port"),
