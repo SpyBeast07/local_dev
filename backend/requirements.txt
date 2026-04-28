@@ -6,3 +6,4 @@ pandas
 openpyxl
 pydbml
 python-multipart
+boto3
