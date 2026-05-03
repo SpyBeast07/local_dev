@@ -12,7 +12,7 @@
 	}: { 
 		children: any,
 		onclick?: (e: MouseEvent) => void,
-		variant?: "primary" | "secondary" | "danger" | "ghost" | "cyan" | "indigo",
+		variant?: "primary" | "secondary" | "danger" | "ghost" | "cyan" | "indigo" | "emerald",
 		size?: "sm" | "md" | "lg",
 		loading?: boolean,
 		disabled?: boolean,
@@ -27,7 +27,8 @@
 		danger: "bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/20",
 		ghost: "bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800",
 		cyan: "bg-cyan-500 hover:bg-cyan-400 text-white shadow-cyan-500/20",
-		indigo: "bg-indigo-500 hover:bg-indigo-400 text-white shadow-indigo-500/20"
+		indigo: "bg-indigo-500 hover:bg-indigo-400 text-white shadow-indigo-500/20",
+		emerald: "bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/20"
 	};
 
 	const sizes = {

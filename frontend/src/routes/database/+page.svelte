@@ -6,6 +6,8 @@
 	import { schemaStore } from '$lib/stores/schemaStore';
 	import { workspaceStore } from '$lib/stores/workspaceStore';
 	import SqlEditor from '$lib/components/SqlEditor.svelte';
+	import Button from '$lib/components/common/Button.svelte';
+	import Badge from '$lib/components/common/Badge.svelte';
 
 	let tables = $state<string[]>([]);
 	let loading = $state(true);
@@ -429,13 +431,14 @@
 					</p>
 					<div class="flex gap-2 items-center">
 						<div class="relative">
-							<button
+							<Button 
 								onclick={() => (showExportDropdown = !showExportDropdown)}
-								disabled={backupLoading}
-								class="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5"
+								variant="emerald"
+								size="sm"
+								class="flex items-center gap-1.5"
 							>
-								Export ▾
-							</button>
+								📤 Export Data
+							</Button>
 							{#if showExportDropdown}
 								<div
 									class="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-1.5 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
@@ -485,12 +488,14 @@
 							/>
 						</label>
 
-						<button
+						<Button
 							onclick={() => (showResetReseedModal = true)}
-							class="bg-rose-500/10 hover:bg-rose-500 text-rose-600 dark:text-rose-400 hover:text-white px-3 py-1.5 rounded-lg border border-rose-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5"
+							variant="danger"
+							size="sm"
+							class="flex items-center gap-1.5"
 						>
 							Reset & Reseed
-						</button>
+						</Button>
 					</div>
 				</div>
 			</div>
@@ -502,13 +507,16 @@
 				><kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">CMD</kbd> +
 				<kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">ENTER</kbd> TO RUN</span
 			>
-			<button
+			<Button
 				onclick={triggerQuery}
 				disabled={!query.trim() || queryLoading}
-				class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-8 py-3 rounded-xl text-white font-black tracking-widest uppercase transition-all flex justify-center items-center gap-2 text-xs shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:shadow-none"
+				loading={queryLoading}
+				variant="emerald"
+				size="lg"
+				class="px-12 py-4 rounded-2xl text-[11px] shadow-xl shadow-emerald-500/20"
 			>
 				⚡ Execute Segment
-			</button>
+			</Button>
 		</div>
 	</div>
 
@@ -523,19 +531,17 @@
 						Execution Result
 					</h3>
 					{#if queryResult.execution_time_ms}
-						<span
-							class="text-[9px] font-black text-indigo-500 uppercase tracking-widest px-2 py-0.5 bg-indigo-500/10 rounded-lg border border-indigo-500/20 shadow-sm animate-in fade-in duration-500"
-						>
-							Latency: {queryResult.execution_time_ms}ms
-						</span>
+						<Badge text="Latency: {queryResult.execution_time_ms}ms" variant="premium" />
 					{/if}
 					{#if queryResult.success}
-						<button
+						<Button
 							onclick={() => (showSnippetModal = true)}
-							class="text-[9px] font-black text-emerald-500 hover:text-emerald-400 uppercase tracking-widest px-2 py-0.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 transition-all active:scale-95"
+							variant="emerald"
+							size="sm"
+							class="text-[9px] py-1 px-3"
 						>
 							+ Save Snippet
-						</button>
+						</Button>
 					{/if}
 				</div>
 				<button

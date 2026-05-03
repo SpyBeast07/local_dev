@@ -178,7 +178,25 @@ class StorageService:
 
     @classmethod
     def get_sources(cls):
-        return cls._load_sources()
+        sources = cls._load_sources()
+        for source in sources:
+            source["is_online"] = cls.check_connectivity(source)
+        return sources
+
+    @staticmethod
+    def check_connectivity(source: Dict[str, Any]) -> bool:
+        """Lightweight check to see if the endpoint is reachable."""
+        try:
+            from urllib.parse import urlparse
+            url = urlparse(source["endpoint"])
+            host = url.hostname or "localhost"
+            port = url.port or (80 if url.scheme == "http" else 443)
+            
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1.0)
+                return s.connect_ex((host, port)) == 0
+        except Exception:
+            return False
 
     @classmethod
     def delete_source(cls, source_id: str):

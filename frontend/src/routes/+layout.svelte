@@ -2,6 +2,7 @@
 	import "../app.css";
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
+	import NavItem from "$lib/components/common/NavItem.svelte";
 	let { children } = $props();
 
 	let isDark = $state(true);
@@ -77,12 +78,15 @@
 
 			<nav class="flex flex-col gap-1 overflow-y-auto custom-scrollbar flex-1 pr-2 pb-4">
 				
-				<a href="/" class="flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group border mb-4 {isActive('/') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white hover:border-slate-200 dark:hover:border-slate-800'}" title="Dashboard">
-					<span class="w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/') ? 'bg-indigo-500/20 shadow-lg shadow-indigo-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-indigo-500/10'}">🏠</span>
-					{#if !isCollapsed}
-						<span class="font-semibold tracking-tight {isActive('/') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Dashboard</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/" 
+					label="Dashboard" 
+					icon="🏠" 
+					{isCollapsed} 
+					active={isActive('/')} 
+					color="indigo" 
+					mt="mb-4"
+				/>
 				
 				<!-- DOCKER ENGINE -->
 				{#if !isCollapsed}
@@ -91,40 +95,51 @@
 					<div class="h-px bg-slate-100 dark:bg-slate-900 my-4 px-3"></div>
 				{/if}
 				
-				<a href="/containers" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/containers') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Containers">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/containers') ? 'bg-blue-500/20 shadow-lg shadow-blue-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-blue-500/10'}">🐳</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/containers') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Containers</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/containers" 
+					label="Containers" 
+					icon="🐳" 
+					{isCollapsed} 
+					active={isActive('/containers')} 
+					color="blue" 
+				/>
 
-				<a href="/deploy" class={["flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border", isActive('/deploy') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800', !isCollapsed ? "ml-5 border-l-2 border-l-slate-100 dark:border-l-slate-800" : ""].join(" ")} title="Deploy App">
-					<span class="w-6 h-6 rounded-lg flex items-center justify-center text-xs transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/deploy') ? 'bg-rose-500/20 shadow-lg shadow-rose-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-rose-500/10'}">🚀</span>
-					{#if !isCollapsed}
-						<span class="font-bold text-xs tracking-tight transition-colors {isActive('/deploy') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'}">Deploy App</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/deploy" 
+					label="Deploy App" 
+					icon="🚀" 
+					{isCollapsed} 
+					active={isActive('/deploy')} 
+					color="rose" 
+					indent={true}
+				/>
 
-				<a href="/images" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/images') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Images">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/images') ? 'bg-amber-500/20 shadow-lg shadow-amber-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-amber-500/10'}">📦</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/images') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Images</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/images" 
+					label="Images" 
+					icon="📦" 
+					{isCollapsed} 
+					active={isActive('/images')} 
+					color="amber" 
+				/>
 
-				<a href="/volumes" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/volumes') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Volumes">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/volumes') ? 'bg-orange-500/20 shadow-lg shadow-orange-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-orange-500/10'}">🧱</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/volumes') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Volumes</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/volumes" 
+					label="Volumes" 
+					icon="🧱" 
+					{isCollapsed} 
+					active={isActive('/volumes')} 
+					color="orange" 
+				/>
 
-				<a href="/networks" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/networks') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Networks">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/networks') ? 'bg-cyan-500/20 shadow-lg shadow-cyan-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-cyan-500/10'}">🕸️</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/networks') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Networks</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/networks" 
+					label="Networks" 
+					icon="🕸️" 
+					{isCollapsed} 
+					active={isActive('/networks')} 
+					color="cyan" 
+				/>
 
 				<!-- SYSTEM NETWORKING -->
 				{#if !isCollapsed}
@@ -133,12 +148,14 @@
 					<div class="h-px bg-slate-100 dark:bg-slate-900 my-4 px-3"></div>
 				{/if}
 
-				<a href="/ports" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/ports') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Active Ports">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/ports') ? 'bg-amber-500/20 shadow-lg shadow-amber-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-amber-500/10'}">🌐</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/ports') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Active Ports</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/ports" 
+					label="Active Ports" 
+					icon="🌐" 
+					{isCollapsed} 
+					active={isActive('/ports')} 
+					color="amber" 
+				/>
 
 				<!-- STORAGE -->
 				{#if !isCollapsed}
@@ -147,12 +164,14 @@
 					<div class="h-px bg-slate-100 dark:bg-slate-900 my-4 px-3"></div>
 				{/if}
 
-				<a href="/sources" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/sources') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Object Storage">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/sources') ? 'bg-blue-500/20 shadow-lg shadow-blue-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-blue-500/10'}">📦</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/sources') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Object Storage</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/sources" 
+					label="Object Storage" 
+					icon="📦" 
+					{isCollapsed} 
+					active={isActive('/sources')} 
+					color="blue" 
+				/>
 
 				<!-- DATABASE -->
 				{#if !isCollapsed}
@@ -161,40 +180,51 @@
 					<div class="h-px bg-slate-100 dark:bg-slate-900 my-4 px-3"></div>
 				{/if}
 
-				<a href="/database" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/database') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Schema Explorer">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/database') ? 'bg-emerald-500/20 shadow-lg shadow-emerald-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-emerald-500/10'}">🗄️</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/database') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Schema Explorer</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/database" 
+					label="Schema Explorer" 
+					icon="🗄️" 
+					{isCollapsed} 
+					active={isActive('/database')} 
+					color="emerald" 
+				/>
 
-				<a href="/relations" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/relations') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Relations">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/relations') ? 'bg-purple-500/20 shadow-lg shadow-purple-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-purple-500/10'}">🧠</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/relations') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Relations</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/relations" 
+					label="Relations" 
+					icon="🧠" 
+					{isCollapsed} 
+					active={isActive('/relations')} 
+					color="purple" 
+				/>
 
-				<a href="/query-builder" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/query-builder') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Query Builder">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/query-builder') ? 'bg-indigo-500/20 shadow-lg shadow-indigo-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-indigo-500/10'}">🧩</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/query-builder') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Query Builder</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/query-builder" 
+					label="Query Builder" 
+					icon="🧩" 
+					{isCollapsed} 
+					active={isActive('/query-builder')} 
+					color="indigo" 
+				/>
 
-				<a href="/workspace" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border {isActive('/workspace') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Developer Workspace">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:scale-125 group-hover:rotate-12 {isActive('/workspace') ? 'bg-violet-500/20 shadow-lg shadow-violet-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-violet-500/10'}">🛠️</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/workspace') ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200'}">Workspace</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/workspace" 
+					label="Workspace" 
+					icon="🛠️" 
+					{isCollapsed} 
+					active={isActive('/workspace')} 
+					color="violet" 
+				/>
 
-				<a href="/config" class="flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group border mt-6 {isActive('/config') ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-inner' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-800'}" title="Settings">
-					<span class="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all duration-300 group-hover:rotate-90 {isActive('/config') ? 'bg-cyan-500/20 shadow-lg shadow-cyan-500/20' : 'bg-slate-50 dark:bg-slate-900 group-hover:bg-cyan-500/10'}">⚙️</span>
-					{#if !isCollapsed}
-						<span class="font-semibold text-sm tracking-tight transition-colors {isActive('/config') ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}">Settings</span>
-					{/if}
-				</a>
+				<NavItem 
+					href="/config" 
+					label="Settings" 
+					icon="⚙️" 
+					{isCollapsed} 
+					active={isActive('/config')} 
+					color="cyan" 
+					mt="mt-6"
+				/>
 			</nav>
 
 			<div class="mt-auto flex flex-col gap-6 overflow-hidden">

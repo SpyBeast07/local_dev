@@ -4,6 +4,8 @@
 	import { schemaStore } from '$lib/stores/schemaStore';
 	import SqlEditor from '$lib/components/SqlEditor.svelte';
 	import { Network } from 'vis-network/standalone';
+	import Button from '$lib/components/common/Button.svelte';
+	import Badge from '$lib/components/common/Badge.svelte';
 
 	let container = $state<HTMLElement>();
 	let loading = $state(true);
@@ -628,16 +630,20 @@
 								>LEGEND</span
 							>
 							<div class="flex items-center gap-3">
-								<button
+								<Button
 									onclick={() => network?.fit()}
-									class="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-1"
+									variant="ghost"
+									size="sm"
+									class="text-[9px] px-2 py-1 flex items-center gap-1"
 								>
 									<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
 									Fit
-								</button>
-								<button
+								</Button>
+								<Button
 									onclick={resetFilters}
-									class="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-1"
+									variant="ghost"
+									size="sm"
+									class="text-[9px] px-2 py-1 flex items-center gap-1"
 								>
 									<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
 										><path
@@ -648,7 +654,7 @@
 										/></svg
 									>
 									Reset
-								</button>
+								</Button>
 							</div>
 						</div>
 						<div class="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -970,9 +976,7 @@
 											Service Details
 										</h3>
 										{#if selectedNode.metadata.is_group}
-											<span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-500 text-[9px] font-black uppercase tracking-widest border border-indigo-500/20">
-												{selectedNode.metadata.instance_count} INSTANCES
-											</span>
+											<Badge text="{selectedNode.metadata.instance_count} INSTANCES" variant="premium" />
 										{/if}
 									</div>
 									<div class="space-y-3">

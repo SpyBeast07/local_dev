@@ -13,6 +13,7 @@
 		access_key: string;
 		secret_key: string;
 		region: string;
+		is_online: boolean;
 	}
 
 	let sources = $state<Source[]>([]);
@@ -89,9 +90,18 @@
 <div class="space-y-12" in:fade>
 	<div class="flex items-end justify-between">
 		<header class="flex flex-col gap-3">
-			<h1 class="text-6xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase leading-none">
-				Object <span class="text-indigo-600 uppercase italic">Storage.</span>
-			</h1>
+			<div class="flex items-center gap-4">
+				<h1 class="text-6xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase leading-none">
+					Object <span class="text-indigo-600 uppercase italic">Storage.</span>
+				</h1>
+				<button 
+					onclick={fetchSources}
+					class="w-10 h-10 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center hover:text-indigo-600 transition-all shadow-sm active:scale-90"
+					title="Refresh Status"
+				>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+				</button>
+			</div>
 			<p class="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs ml-1">
 				Synchronized S3 & MinIO Data Vaults
 			</p>
@@ -133,16 +143,34 @@
 					</div>
 
 					<div class="space-y-4">
-						<h3 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic">{source.name}</h3>
+						<div class="flex items-center justify-between">
+							<h3 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic">{source.name}</h3>
+							{#if source.is_online}
+								<span class="flex items-center gap-1.5 text-[9px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/10">
+									<span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+									Online
+								</span>
+							{:else}
+								<span class="flex items-center gap-1.5 text-[9px] font-black text-rose-500 uppercase tracking-widest bg-rose-500/10 px-2 py-1 rounded-full border border-rose-500/10">
+									<span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
+									Offline
+								</span>
+							{/if}
+						</div>
 						<Badge text={source.endpoint} variant="neutral" />
 					</div>
 
 					<div class="mt-10">
 						<a 
-							href="/sources/{source.id}"
-							class="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-indigo-600 dark:hover:bg-indigo-50 dark:hover:text-indigo-600 transition-all shadow-lg active:scale-95"
+							href={source.is_online ? `/sources/${source.id}` : '#'}
+							class={[
+								"w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95",
+								source.is_online 
+									? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-indigo-600 dark:hover:bg-indigo-50 dark:hover:text-indigo-600" 
+									: "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-200 dark:border-slate-700"
+							].join(" ")}
 						>
-							Explore Vault
+							{source.is_online ? 'Explore Vault' : 'Vault Inaccessible'}
 						</a>
 					</div>
 				</Card>
