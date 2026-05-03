@@ -629,7 +629,7 @@
 							<span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]"
 								>LEGEND</span
 							>
-							<div class="flex items-center gap-3">
+							<div class="flex items-center gap-1">
 								<Button
 									onclick={() => network?.fit()}
 									variant="ghost"
@@ -803,16 +803,6 @@
 
 				<div bind:this={container} class="w-full h-full rounded-[2rem] focus:outline-none"></div>
 
-				<!-- Graph Controls Overlay -->
-				<div class="absolute bottom-8 right-8 flex items-center gap-2 z-20">
-					<button 
-						onclick={() => network?.fit()}
-						class="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-500 hover:text-indigo-500 transition-all shadow-xl"
-						title="Fit view"
-					>
-						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
-					</button>
-				</div>
 			</div>
 
 		{#if selectedNode || impactData || traceData}
