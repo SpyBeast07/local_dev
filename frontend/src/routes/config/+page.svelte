@@ -6,6 +6,8 @@
 	import Card from "$lib/components/common/Card.svelte";
 	import InputField from "$lib/components/common/InputField.svelte";
 	import Modal from "$lib/components/common/Modal.svelte";
+	import { uiState } from "$lib/stores/uiStore.svelte";
+
 
 	let config = $state({
 		db_type: "postgres",
@@ -269,6 +271,86 @@
 								Authorize & Connect
 							</Button>
 						</div>
+					</div>
+				</div>
+			</Card>
+		</div>
+
+		<div class="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start mt-8">
+			<!-- APPEARANCE SECTION -->
+			<Card class="h-full">
+				<div class="absolute -right-20 -top-20 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl group-hover:bg-amber-500/10 transition-colors duration-700 pointer-events-none"></div>
+
+				<div class="flex items-center gap-4 mb-8 pb-8 border-b border-slate-100 dark:border-slate-800">
+					<div class="w-12 h-12 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-2xl flex items-center justify-center shadow-inner border border-amber-100 dark:border-amber-900/30">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+					</div>
+					<div>
+						<h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic leading-none">Appearance</h2>
+						<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 block">Visual Experience</p>
+					</div>
+				</div>
+
+				<div class="space-y-6">
+					<div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800">
+						<div>
+							<p class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">Dark Mode</p>
+							<p class="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mt-1">System wide theme</p>
+						</div>
+						<button 
+							onclick={() => uiState.toggleTheme()}
+							class={[
+								"w-14 h-8 rounded-full transition-all duration-300 relative border",
+								uiState.isDark ? "bg-indigo-600 border-indigo-400" : "bg-slate-200 border-slate-300"
+							].join(" ")}
+						>
+							<div class={[
+								"absolute top-1 w-5.5 h-5.5 rounded-full transition-all duration-300 flex items-center justify-center text-[10px]",
+								uiState.isDark ? "left-7 bg-white text-indigo-600" : "left-1 bg-white text-slate-400"
+							].join(" ")}>
+								{uiState.isDark ? '🌙' : '☀️'}
+							</div>
+						</button>
+					</div>
+					
+					<p class="text-[10px] text-slate-400 italic px-2">
+						Changes are applied immediately and synchronized across all workspace components.
+					</p>
+				</div>
+			</Card>
+
+			<!-- LEGAL SECTION -->
+			<Card class="h-full">
+				<div class="absolute -right-20 -top-20 w-64 h-64 bg-rose-500/5 rounded-full blur-3xl group-hover:bg-rose-500/10 transition-colors duration-700 pointer-events-none"></div>
+
+				<div class="flex items-center gap-4 mb-8 pb-8 border-b border-slate-100 dark:border-slate-800">
+					<div class="w-12 h-12 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-2xl flex items-center justify-center shadow-inner border border-rose-100 dark:border-rose-900/30">
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+					</div>
+					<div>
+						<h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic leading-none">Compliance</h2>
+						<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 block">Legal & Governance</p>
+					</div>
+				</div>
+
+				<div class="space-y-6">
+					<div class="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10">
+						<p class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-tight mb-2">Terms & Conditions</p>
+						<p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-4">
+							Our Terms and Conditions outline your rights and responsibilities when using DevBeast Workspace. Ensure you understand the limitation of liability and governing laws.
+						</p>
+						<a 
+							href="/terms" 
+							class="inline-flex items-center gap-2 text-[10px] font-black text-rose-500 hover:text-rose-600 uppercase tracking-[0.2em] transition-all group"
+						>
+							View Full Documentation
+							<span class="group-hover:translate-x-1 transition-transform">→</span>
+						</a>
+					</div>
+
+					<div class="flex items-center justify-between px-2">
+						<span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Version</span>
+						<span class="text-[10px] font-mono text-slate-500">v1.0.4-legal-ready</span>
 					</div>
 				</div>
 			</Card>

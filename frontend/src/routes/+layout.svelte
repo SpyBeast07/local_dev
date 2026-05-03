@@ -4,10 +4,8 @@
 	import { page } from "$app/state";
 	import axios from "axios";
 	import NavItem from "$lib/components/common/NavItem.svelte";
+	import { uiState } from "$lib/stores/uiStore.svelte";
 	let { children } = $props();
-
-	let isDark = $state(true);
-	let isCollapsed = $state(false);
 
 	let systemStats = $state({
 		cpu_usage: 0,
@@ -35,51 +33,28 @@
 		return page.url.pathname.startsWith(path);
 	}
 
-	function toggleTheme() {
-		isDark = !isDark;
-		if (typeof window !== 'undefined') {
-			localStorage.setItem("devbeast-theme", isDark ? "dark" : "light");
-		}
-	}
-
-	function toggleSidebar() {
-		isCollapsed = !isCollapsed;
-		if (typeof window !== 'undefined') {
-			localStorage.setItem("devbeast-sidebar", isCollapsed ? "collapsed" : "expanded");
-		}
-	}
-
 	onMount(() => {
 		fetchSystemStats();
 		const interval = setInterval(fetchSystemStats, 5000);
-		if (typeof window !== 'undefined') {
-			const savedTheme = localStorage.getItem("devbeast-theme");
-			if (savedTheme) {
-				isDark = savedTheme === "dark";
-			}
-			const savedSidebar = localStorage.getItem("devbeast-sidebar");
-			if (savedSidebar) {
-				isCollapsed = savedSidebar === "collapsed";
-			}
-		}
+		return () => clearInterval(interval);
 	});
 </script>
 
-<div class={["flex h-screen w-screen overflow-hidden font-sans transition-colors duration-500", isDark ? "dark" : ""].join(" ")} style="--root-bg: {isDark ? '#020617' : '#f8fafc'}">
+<div class={["flex h-screen w-screen overflow-hidden font-sans transition-colors duration-500", uiState.isDark ? "dark" : ""].join(" ")} style="--root-bg: {uiState.isDark ? '#020617' : '#f8fafc'}">
 	<div class="flex flex-1 w-full max-w-full overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-500 min-h-0">
 		<!-- Sidebar -->
 		<aside class={[
 			"relative bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-300 flex flex-col shrink-0 shadow-2xl z-10 border-r border-slate-200 dark:border-slate-900 transition-all duration-300 ease-in-out h-screen",
-			isCollapsed ? "w-20 px-3 py-6" : "w-72 p-8"
+			uiState.isCollapsed ? "w-20 px-3 py-6" : "w-72 p-8"
 		].join(" ")}>
 			<!-- Toggle Button -->
 			<button 
-				onclick={toggleSidebar}
+				onclick={() => uiState.toggleSidebar()}
 				class="absolute -right-3 top-10 w-6 h-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/20 z-20 group border border-indigo-400"
 				aria-label="Toggle Sidebar"
 			>
 				<svg 
-					class={["w-4 h-4 transition-transform duration-300", isCollapsed ? "rotate-180" : ""].join(" ")}
+					class={["w-4 h-4 transition-transform duration-300", uiState.isCollapsed ? "rotate-180" : ""].join(" ")}
 					fill="none" 
 					stroke="currentColor" 
 					viewBox="0 0 24 24"
@@ -92,7 +67,7 @@
 				<div class="w-10 h-10 bg-slate-100 dark:bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/10 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shrink-0 overflow-hidden border border-slate-200 dark:border-slate-800">
 					<img src="/logo.png" alt="DevBeast Logo" class="w-full h-full object-cover" />
 				</div>
-				{#if !isCollapsed}
+				{#if !uiState.isCollapsed}
 					<div class="flex flex-col animate-in fade-in slide-in-from-left duration-300">
 						<h1 class="text-xl font-black text-slate-900 dark:text-white tracking-tighter leading-none italic uppercase">DEV<span class="text-indigo-500">BEAST</span></h1>
 						<span class="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400 dark:text-slate-500 mt-1">Workspace v1.0</span>
@@ -106,14 +81,14 @@
 					href="/" 
 					label="Dashboard" 
 					icon="🏠" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/')} 
 					color="indigo" 
 					mt="mb-4"
 				/>
 				
 				<!-- DOCKER ENGINE -->
-				{#if !isCollapsed}
+				{#if !uiState.isCollapsed}
 					<p class="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em] mb-2 px-3 mt-2 animate-in fade-in duration-300">Docker Engine</p>
 				{:else}
 					<div class="h-px bg-slate-100 dark:bg-slate-900 my-4 px-3"></div>
@@ -123,7 +98,7 @@
 					href="/containers" 
 					label="Containers" 
 					icon="🐳" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/containers')} 
 					color="blue" 
 				/>
@@ -132,7 +107,7 @@
 					href="/deploy" 
 					label="Deploy App" 
 					icon="🚀" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/deploy')} 
 					color="rose" 
 					indent={true}
@@ -142,7 +117,7 @@
 					href="/images" 
 					label="Images" 
 					icon="📦" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/images')} 
 					color="amber" 
 				/>
@@ -151,7 +126,7 @@
 					href="/volumes" 
 					label="Volumes" 
 					icon="🧱" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/volumes')} 
 					color="orange" 
 				/>
@@ -160,13 +135,13 @@
 					href="/networks" 
 					label="Networks" 
 					icon="🕸️" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/networks')} 
 					color="cyan" 
 				/>
 
 				<!-- SYSTEM NETWORKING -->
-				{#if !isCollapsed}
+				{#if !uiState.isCollapsed}
 					<p class="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em] mb-2 px-3 mt-6 animate-in fade-in duration-300">Networking</p>
 				{:else}
 					<div class="h-px bg-slate-100 dark:bg-slate-900 my-4 px-3"></div>
@@ -176,13 +151,13 @@
 					href="/ports" 
 					label="Active Ports" 
 					icon="🌐" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/ports')} 
 					color="amber" 
 				/>
 
 				<!-- STORAGE -->
-				{#if !isCollapsed}
+				{#if !uiState.isCollapsed}
 					<p class="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em] mb-2 px-3 mt-6 animate-in fade-in duration-300">Storage</p>
 				{:else}
 					<div class="h-px bg-slate-100 dark:bg-slate-900 my-4 px-3"></div>
@@ -192,13 +167,13 @@
 					href="/sources" 
 					label="Object Storage" 
 					icon="📦" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/sources')} 
 					color="blue" 
 				/>
 
 				<!-- DATABASE -->
-				{#if !isCollapsed}
+				{#if !uiState.isCollapsed}
 					<p class="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em] mb-2 px-3 mt-6 animate-in fade-in duration-300">Database</p>
 				{:else}
 					<div class="h-px bg-slate-100 dark:bg-slate-900 my-4 px-3"></div>
@@ -208,7 +183,7 @@
 					href="/database" 
 					label="Schema Explorer" 
 					icon="🗄️" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/database')} 
 					color="emerald" 
 				/>
@@ -217,7 +192,7 @@
 					href="/relations" 
 					label="Relations" 
 					icon="🧠" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/relations')} 
 					color="purple" 
 				/>
@@ -226,7 +201,7 @@
 					href="/query-builder" 
 					label="Query Builder" 
 					icon="🧩" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/query-builder')} 
 					color="indigo" 
 				/>
@@ -235,7 +210,7 @@
 					href="/workspace" 
 					label="Workspace" 
 					icon="🛠️" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/workspace')} 
 					color="violet" 
 				/>
@@ -244,7 +219,7 @@
 					href="/config" 
 					label="Settings" 
 					icon="⚙️" 
-					{isCollapsed} 
+					isCollapsed={uiState.isCollapsed} 
 					active={isActive('/config')} 
 					color="cyan" 
 					mt="mt-6"
@@ -252,29 +227,8 @@
 			</nav>
 
 			<div class="mt-auto flex flex-col gap-6 overflow-hidden">
-				<!-- Theme Toggle -->
-				<button 
-					onclick={toggleTheme}
-					class={[
-						"flex items-center p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-indigo-500/50 transition-all group",
-						isCollapsed ? "justify-center" : "justify-between"
-					].join(" ")}
-					aria-label="Toggle dark mode"
-				>
-					{#if !isCollapsed}
-						<span class="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1 animate-in fade-in duration-300">Appearance</span>
-					{/if}
-					<div class={["flex items-center gap-1 bg-slate-100 dark:bg-slate-950 rounded-xl", !isCollapsed ? "p-1 border border-slate-200 dark:border-slate-800" : ""].join(" ")}>
-						{#if !isCollapsed}
-							<div class="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-300 {isDark ? 'text-slate-600' : 'bg-white text-indigo-600 shadow-lg scale-110'}">☀️</div>
-							<div class="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-300 {isDark ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 scale-110' : 'text-slate-600'}">🌙</div>
-						{:else}
-							<div class="text-xl">{isDark ? '🌙' : '☀️'}</div>
-						{/if}
-					</div>
-				</button>
 
-				{#if !isCollapsed}
+				{#if !uiState.isCollapsed}
 					<div class="bg-slate-50/50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/50 animate-in fade-in slide-in-from-bottom-2 duration-300">
 						<div class="flex items-center justify-between mb-2">
 							<span class="text-xs font-bold text-slate-400">System Load</span>
@@ -306,6 +260,7 @@
 						<div class="w-3 h-3 bg-indigo-500 rounded-full animate-pulse shadow-lg shadow-indigo-500/50"></div>
 					</div>
 				{/if}
+
 			</div>
 		</aside>
 
