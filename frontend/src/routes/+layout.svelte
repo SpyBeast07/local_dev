@@ -2,11 +2,33 @@
 	import "../app.css";
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
+	import axios from "axios";
 	import NavItem from "$lib/components/common/NavItem.svelte";
 	let { children } = $props();
 
 	let isDark = $state(true);
 	let isCollapsed = $state(false);
+
+	let systemStats = $state({
+		cpu_usage: 0,
+		memory_usage: 0,
+		load_status: 'Stable'
+	});
+
+	async function fetchSystemStats() {
+		try {
+			const res = await axios.get("http://127.0.0.1:8000/system/stats");
+			if (res.data.success) {
+				systemStats = {
+					cpu_usage: res.data.cpu_usage,
+					memory_usage: res.data.memory_usage,
+					load_status: res.data.load_status
+				};
+			}
+		} catch (err) {
+			console.error("Failed to fetch system stats", err);
+		}
+	}
 
 	function isActive(path: string) {
 		if (path === '/') return page.url.pathname === '/';
@@ -28,6 +50,8 @@
 	}
 
 	onMount(() => {
+		fetchSystemStats();
+		const interval = setInterval(fetchSystemStats, 5000);
 		if (typeof window !== 'undefined') {
 			const savedTheme = localStorage.getItem("devbeast-theme");
 			if (savedTheme) {
@@ -254,10 +278,27 @@
 					<div class="bg-slate-50/50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/50 animate-in fade-in slide-in-from-bottom-2 duration-300">
 						<div class="flex items-center justify-between mb-2">
 							<span class="text-xs font-bold text-slate-400">System Load</span>
-							<span class="text-[10px] px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-full font-bold">Stable</span>
+							<span class={[
+								"text-[10px] px-1.5 py-0.5 rounded-full font-bold transition-colors duration-500",
+								systemStats.load_status === 'Heavy' ? 'bg-rose-500/10 text-rose-400' : 
+								systemStats.load_status === 'Moderate' ? 'bg-amber-500/10 text-amber-400' : 
+								'bg-indigo-500/10 text-indigo-400'
+							].join(" ")}>{systemStats.load_status}</span>
 						</div>
 						<div class="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-							<div class="h-full w-[35%] bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+							<div 
+								class={[
+									"h-full rounded-full transition-all duration-1000 ease-in-out",
+									systemStats.cpu_usage > 80 ? 'bg-gradient-to-r from-rose-500 to-orange-500' :
+									systemStats.cpu_usage > 40 ? 'bg-gradient-to-r from-amber-500 to-orange-500' :
+									'bg-gradient-to-r from-indigo-500 to-purple-500'
+								].join(" ")} 
+								style="width: {systemStats.cpu_usage}%"
+							></div>
+						</div>
+						<div class="mt-2 flex justify-between items-center text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+							<span>CPU: {systemStats.cpu_usage}%</span>
+							<span>MEM: {systemStats.memory_usage}%</span>
 						</div>
 					</div>
 				{:else}

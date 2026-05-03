@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 import json
+import subprocess
 import io
 from pydantic import BaseModel
 from typing import Optional, Annotated
@@ -48,7 +49,50 @@ class QueryRequest(BaseModel):
 async def register_trace_query(request: QueryRequest):
     return trace_query(request.query)
 
-@app.get("/system/impact-analysis")
+@app.get("/system/stats")
+def system_stats():
+    """Returns real-time host system metrics (CPU/Memory)."""
+    try:
+        # CPU Usage
+        cpu_res = subprocess.run(["top", "-l", "1", "-n", "0"], capture_output=True, text=True)
+        idle = 0
+        for line in cpu_res.stdout.split('\n'):
+            if "CPU usage:" in line:
+                # Format: "CPU usage: 6.82% user, 18.11% sys, 75.6% idle"
+                parts = line.split(',')
+                for p in parts:
+                    if "idle" in p:
+                        idle = float(p.strip().split('%')[0])
+                        break
+                break
+        
+        # Memory Usage (Mac specific)
+        mem_res = subprocess.run(["vm_stat"], capture_output=True, text=True)
+        # Parse vm_stat output (multiplied by page size, usually 4096)
+        page_size = 4096 # Standard for modern macOS
+        free = 0
+        active = 0
+        inactive = 0
+        wired = 0
+        
+        for line in mem_res.stdout.split('\n'):
+            if "Pages free:" in line: free = int(line.split()[-1].strip('.'))
+            if "Pages active:" in line: active = int(line.split()[-1].strip('.'))
+            if "Pages inactive:" in line: inactive = int(line.split()[-1].strip('.'))
+            if "Pages wired down:" in line: wired = int(line.split()[-1].strip('.'))
+            
+        total_used = (active + wired) * page_size
+        total_mem = (free + active + inactive + wired) * page_size
+        mem_percent = (total_used / total_mem) * 100 if total_mem > 0 else 0
+        
+        return {
+            "success": True,
+            "cpu_usage": round(100 - idle, 1),
+            "memory_usage": round(mem_percent, 1),
+            "load_status": "Heavy" if (100-idle) > 80 else "Moderate" if (100-idle) > 40 else "Stable"
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 def impact_analysis(table: str):
     return get_impact_analysis(table)
