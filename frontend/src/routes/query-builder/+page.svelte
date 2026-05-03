@@ -14,7 +14,7 @@
 	<meta name="description" content="Design complex SQL JOIN queries visually with interactive table modeling." />
 </svelte:head>
 
-<div class="flex flex-col h-[calc(100vh-5rem)]">
+<div class="flex-1 flex flex-col min-h-0">
 	<header class="flex flex-col gap-3 shrink-0 mb-6">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-4">

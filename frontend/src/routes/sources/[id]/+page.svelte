@@ -213,7 +213,7 @@
 	);
 </script>
 
-<div class="grid grid-cols-1 lg:grid-cols-4 gap-8 h-[calc(100vh-140px)] overflow-hidden" in:fade>
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-8 flex-1 overflow-hidden" in:fade>
 	<!-- Sidebar: Buckets -->
 	<aside class="lg:col-span-1 space-y-6 flex flex-col min-h-0">
 		<Card padding="p-6" class="flex-1 flex flex-col overflow-hidden">

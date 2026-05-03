@@ -117,7 +117,7 @@
 	</div>
 {/snippet}
 
-<div class="flex flex-col gap-10 pb-20">
+<div class="flex flex-col gap-10 ">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-center gap-4">
 			<a href="/" class="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-200 dark:hover:border-amber-800 transition-all shadow-sm" aria-label="Back to dashboard">

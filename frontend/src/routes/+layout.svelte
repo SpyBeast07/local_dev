@@ -1,6 +1,5 @@
 <script lang="ts">
 	import "../app.css";
-	import "../app.css";
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
 	let { children } = $props();
@@ -41,8 +40,8 @@
 	});
 </script>
 
-<div class={["flex h-screen w-screen overflow-hidden font-sans transition-colors duration-500", isDark ? "dark" : ""].join(" ")}>
-	<div class="flex flex-1 w-full max-w-full overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-500">
+<div class={["flex h-screen w-screen overflow-hidden font-sans transition-colors duration-500", isDark ? "dark" : ""].join(" ")} style="--root-bg: {isDark ? '#020617' : '#f8fafc'}">
+	<div class="flex flex-1 w-full max-w-full overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-500 min-h-0">
 		<!-- Sidebar -->
 		<aside class={[
 			"relative bg-slate-950 text-slate-300 flex flex-col shrink-0 shadow-2xl z-10 border-r border-slate-900 transition-all duration-300 ease-in-out h-screen",
@@ -240,12 +239,14 @@
 		</aside>
 
 		<!-- Main Content -->
-		<main class="flex-1 min-w-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 relative transition-colors duration-500">
+		<main class="flex-1 min-w-0 min-h-0 bg-slate-50 dark:bg-slate-950 relative transition-colors duration-500 overflow-hidden flex flex-col">
 			<!-- Subtle background gradient -->
 			<div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100/20 dark:from-indigo-900/10 via-transparent to-transparent pointer-events-none"></div>
 			
-			<div class="p-10 w-full max-w-7xl mx-auto relative z-0 text-slate-900 dark:text-slate-100">
-				{@render children()}
+			<div class="flex-1 flex flex-col overflow-hidden min-h-0">
+				<div class="w-full max-w-7xl mx-auto flex-1 flex flex-col min-h-0 px-10 pt-10 pb-0">
+					{@render children()}
+				</div>
 			</div>
 		</main>
 	</div>

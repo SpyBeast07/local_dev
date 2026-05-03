@@ -7,9 +7,10 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
+    overflow: hidden; /* Guarantee the whole page never scrolls globally */
     /* Prevent white background flash on overscroll (macOS/iOS) */
-    background-color: #020617; /* Slate-950 */
-    overscroll-behavior-y: none;
+    background-color: var(--root-bg, #0f172a); 
+    overscroll-behavior: none;
 }
 
 /* Ensure overscroll doesn't reveal a white surface on specific scroll containers */

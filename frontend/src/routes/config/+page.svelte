@@ -125,7 +125,7 @@
 
 </script>
 
-<div class="flex flex-col gap-10 pb-20">
+<div class="flex-1 flex flex-col gap-10 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar pr-4 pb-10">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-center gap-4">
 			<a href="/" class="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400 hover:border-cyan-200 dark:hover:border-cyan-800 transition-all shadow-sm" aria-label="Back to dashboard">

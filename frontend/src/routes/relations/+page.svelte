@@ -496,7 +496,7 @@
 	}
 </script>
 
-<div class="flex flex-col h-[calc(100vh-5rem)]">
+<div class="flex-1 flex flex-col min-h-0">
 	<header class="flex flex-col gap-3 shrink-0 mb-6">
 		<div class="flex items-center gap-4">
 			<a

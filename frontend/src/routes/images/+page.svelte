@@ -56,7 +56,7 @@
 	onMount(fetchImages);
 </script>
 
-<div class="flex flex-col gap-10 pb-20">
+<div class="flex flex-col gap-10 ">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-center gap-4">
 			<h1 class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase leading-none">Image Registry<span class="text-amber-500 uppercase italic">.</span></h1>

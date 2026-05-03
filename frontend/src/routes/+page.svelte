@@ -52,7 +52,7 @@
 	});
 </script>
 
-<div class="flex flex-col gap-10 pb-20">
+<div class="flex flex-col gap-10 ">
 	<header class="flex flex-col gap-3">
 		<h1 class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase leading-none">Dashboard<span class="text-indigo-600 uppercase italic">.</span></h1>
 		<p class="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest text-xs">Environment Summaries & Shortcuts</p>

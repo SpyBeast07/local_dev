@@ -53,7 +53,7 @@
 	}
 </script>
 
-<div class="flex flex-col gap-10 pb-20 max-w-4xl">
+<div class="flex flex-col gap-10  max-w-4xl">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-center gap-4">
 			<h1 class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase leading-none">Deploy<span class="text-rose-500 uppercase italic">.</span></h1>

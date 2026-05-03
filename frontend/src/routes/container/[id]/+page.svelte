@@ -50,7 +50,7 @@
 	});
 </script>
 
-<div class="flex flex-col gap-8 pb-10 h-[calc(100vh-6rem)]">
+<div class="flex flex-col gap-8 flex-1">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-center gap-4">
 			<a href="/containers" class="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-800 transition-all shadow-sm" aria-label="Back to containers">

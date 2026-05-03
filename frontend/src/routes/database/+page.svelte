@@ -74,10 +74,11 @@
 		if (isMod && e.key.toLowerCase() === 's') {
 			e.preventDefault();
 			const cleanQuery = query.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-			const destructiveKeywords = /\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|RENAME|GRANT|REVOKE)\b/i;
+			const destructiveKeywords =
+				/\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE|RENAME|GRANT|REVOKE)\b/i;
 			const isDangerous = cleanQuery.match(destructiveKeywords);
-			
-			// Only allow save if not destructive or after confirmation? 
+
+			// Only allow save if not destructive or after confirmation?
 			// Actually just open the modal if we have a successful result or just open it anyway.
 			if (query.trim()) {
 				showSnippetModal = true;
@@ -255,7 +256,6 @@
 		executeSQL();
 	}
 
-
 	async function executeSQL() {
 		queryLoading = true;
 		queryTrace = null;
@@ -281,11 +281,16 @@
 
 	function getErrorHint(error: string): string | null {
 		if (!error) return null;
-		if (error.includes('42703')) return 'Undefined Column: Typo discovered. Verify your column names against the schema metadata.';
-		if (error.includes('42P01')) return 'Undefined Table: The referenced relation does not exist. Ensure you are using "schema.table" syntax.';
-		if (error.includes('23505')) return 'Unique Violation: A record with this unique identifier already exists in the target array.';
-		if (error.includes('23503')) return 'Foreign Key Violation: You are referencing a non-existent parent or deleting a dependent child.';
-		if (error.includes('42601')) return 'Syntax Error: Structural anomaly detected in your SQL statement near the highlighted segment.';
+		if (error.includes('42703'))
+			return 'Undefined Column: Typo discovered. Verify your column names against the schema metadata.';
+		if (error.includes('42P01'))
+			return 'Undefined Table: The referenced relation does not exist. Ensure you are using "schema.table" syntax.';
+		if (error.includes('23505'))
+			return 'Unique Violation: A record with this unique identifier already exists in the target array.';
+		if (error.includes('23503'))
+			return 'Foreign Key Violation: You are referencing a non-existent parent or deleting a dependent child.';
+		if (error.includes('42601'))
+			return 'Syntax Error: Structural anomaly detected in your SQL statement near the highlighted segment.';
 		return null;
 	}
 
@@ -302,7 +307,14 @@
 
 	async function saveSnippet() {
 		if (!snippetName || !query) return;
-		await workspaceStore.saveSnippet(snippetName, query, snippetTags.split(',').map(t => t.trim()).filter(t => t));
+		await workspaceStore.saveSnippet(
+			snippetName,
+			query,
+			snippetTags
+				.split(',')
+				.map((t) => t.trim())
+				.filter((t) => t)
+		);
 		showSnippetModal = false;
 		snippetName = '';
 		snippetTags = '';
@@ -325,7 +337,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="flex flex-col gap-10 pb-20">
+<div class="flex-1 flex flex-col gap-10 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar pr-4 pb-10">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-center gap-4">
 			<a
@@ -366,7 +378,6 @@
 				</h2>
 			</div>
 
-
 			{#if queryLoading || backupLoading || restoreLoading}
 				<div
 					class="flex items-center gap-3 text-[10px] font-bold text-emerald-500 uppercase tracking-widest"
@@ -380,472 +391,493 @@
 		</div>
 
 		<div class="flex flex-col gap-4">
-			<SqlEditor 
-				bind:value={query} 
-				placeholder="SELECT * FROM public.users;" 
-				onRun={triggerQuery} 
+			<SqlEditor
+				bind:value={query}
+				placeholder="SELECT * FROM public.users;"
+				onRun={triggerQuery}
 			/>
 		</div>
 
-			<!-- Schema naming hint & Portability tools -->
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-				<div
-					class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-3 flex items-start gap-3"
-				>
-					<span class="text-amber-500 text-sm mt-0.5 shrink-0">⚠</span>
-					<div class="flex flex-col gap-1">
-						<p
-							class="text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest"
-						>
-							Schema-Qualified Names Required
-						</p>
-						<p
-							class="text-[11px] font-bold text-amber-600/80 dark:text-amber-500/80 leading-relaxed"
-						>
-							PostgreSQL resolves unqualified names against <code
-								class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded font-mono">public</code
-							>.
-						</p>
-					</div>
-				</div>
-
-				<div
-					class="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-3"
-				>
-					<div class="flex items-center justify-between">
-						<p
-							class="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] italic"
-						>
-							⚡ Database Portability
-						</p>
-						<div class="flex gap-2 items-center">
-							<div class="relative">
-								<button
-									onclick={() => (showExportDropdown = !showExportDropdown)}
-									disabled={backupLoading}
-									class="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5"
-								>
-									Export ▾
-								</button>
-								{#if showExportDropdown}
-									<div
-										class="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-1.5 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
-										use:clickOutside={() => (showExportDropdown = false)}
-									>
-										<button
-											onclick={() => handleBackup('sql')}
-											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
-											>SQL</button
-										>
-										<button
-											onclick={() => handleBackup('json')}
-											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
-											>JSON</button
-										>
-										<button
-											onclick={() => handleBackup('dbml')}
-											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
-											>DBML</button
-										>
-										<button
-											onclick={() => handleBackup('csv')}
-											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
-											>CSV (Zip)</button
-										>
-										<button
-											onclick={() => handleBackup('excel')}
-											class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
-											>Excel</button
-										>
-									</div>
-								{/if}
-							</div>
-
-							<label
-								class="bg-blue-500/10 hover:bg-blue-500 text-blue-600 dark:text-blue-400 hover:text-white px-3 py-1.5 rounded-lg border border-blue-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer"
-							>
-								Restore Payload
-								<input
-									type="file"
-									accept=".sql,.dbml"
-									class="hidden"
-									onchange={(e) => {
-										restoreFile = e.currentTarget.files?.[0] || null;
-										if (restoreFile) showRestoreModal = true;
-									}}
-								/>
-							</label>
-
-							<button
-								onclick={() => (showResetReseedModal = true)}
-								class="bg-rose-500/10 hover:bg-rose-500 text-rose-600 dark:text-rose-400 hover:text-white px-3 py-1.5 rounded-lg border border-rose-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5"
-							>
-								Reset & Reseed
-							</button>
-						</div>
-					</div>
+		<!-- Schema naming hint & Portability tools -->
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<div
+				class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-3 flex items-start gap-3"
+			>
+				<span class="text-amber-500 text-sm mt-0.5 shrink-0">⚠</span>
+				<div class="flex flex-col gap-1">
+					<p
+						class="text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest"
+					>
+						Schema-Qualified Names Required
+					</p>
+					<p class="text-[11px] font-bold text-amber-600/80 dark:text-amber-500/80 leading-relaxed">
+						PostgreSQL resolves unqualified names against <code
+							class="bg-amber-100 dark:bg-amber-900/50 px-1 rounded font-mono">public</code
+						>.
+					</p>
 				</div>
 			</div>
 
-			<div class="flex justify-between items-center">
-				<span
-					class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest"
-					><kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">CMD</kbd> +
-					<kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">ENTER</kbd> TO RUN</span
-				>
-				<button
-					onclick={triggerQuery}
-					disabled={!query.trim() || queryLoading}
-					class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-8 py-3 rounded-xl text-white font-black tracking-widest uppercase transition-all flex justify-center items-center gap-2 text-xs shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:shadow-none"
-				>
-					⚡ Execute Segment
-				</button>
+			<div
+				class="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-3"
+			>
+				<div class="flex items-center justify-between">
+					<p
+						class="text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] italic"
+					>
+						⚡ Database Portability
+					</p>
+					<div class="flex gap-2 items-center">
+						<div class="relative">
+							<button
+								onclick={() => (showExportDropdown = !showExportDropdown)}
+								disabled={backupLoading}
+								class="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg border border-emerald-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5"
+							>
+								Export ▾
+							</button>
+							{#if showExportDropdown}
+								<div
+									class="absolute right-0 top-full mt-2 w-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-1.5 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+									use:clickOutside={() => (showExportDropdown = false)}
+								>
+									<button
+										onclick={() => handleBackup('sql')}
+										class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+										>SQL</button
+									>
+									<button
+										onclick={() => handleBackup('json')}
+										class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+										>JSON</button
+									>
+									<button
+										onclick={() => handleBackup('dbml')}
+										class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+										>DBML</button
+									>
+									<button
+										onclick={() => handleBackup('csv')}
+										class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+										>CSV (Zip)</button
+									>
+									<button
+										onclick={() => handleBackup('excel')}
+										class="px-4 py-2 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:bg-emerald-500 hover:text-white transition-colors"
+										>Excel</button
+									>
+								</div>
+							{/if}
+						</div>
+
+						<label
+							class="bg-blue-500/10 hover:bg-blue-500 text-blue-600 dark:text-blue-400 hover:text-white px-3 py-1.5 rounded-lg border border-blue-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 cursor-pointer"
+						>
+							Restore Payload
+							<input
+								type="file"
+								accept=".sql,.dbml"
+								class="hidden"
+								onchange={(e) => {
+									restoreFile = e.currentTarget.files?.[0] || null;
+									if (restoreFile) showRestoreModal = true;
+								}}
+							/>
+						</label>
+
+						<button
+							onclick={() => (showResetReseedModal = true)}
+							class="bg-rose-500/10 hover:bg-rose-500 text-rose-600 dark:text-rose-400 hover:text-white px-3 py-1.5 rounded-lg border border-rose-500/20 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5"
+						>
+							Reset & Reseed
+						</button>
+					</div>
+				</div>
 			</div>
 		</div>
 
-		<!-- SQL RESULTS GRID -->
-		{#if queryResult}
-			<div
-				class="mt-4 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-4 overflow-hidden"
+		<div class="flex justify-between items-center">
+			<span
+				class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest"
+				><kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">CMD</kbd> +
+				<kbd class="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">ENTER</kbd> TO RUN</span
 			>
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-4">
-						<h3 class="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
-							Execution Result
-						</h3>
-						{#if queryResult.execution_time_ms}
-							<span class="text-[9px] font-black text-indigo-500 uppercase tracking-widest px-2 py-0.5 bg-indigo-500/10 rounded-lg border border-indigo-500/20 shadow-sm animate-in fade-in duration-500">
-								Latency: {queryResult.execution_time_ms}ms
-							</span>
-						{/if}
-						{#if queryResult.success}
-							<button 
-								onclick={() => showSnippetModal = true}
-								class="text-[9px] font-black text-emerald-500 hover:text-emerald-400 uppercase tracking-widest px-2 py-0.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 transition-all active:scale-95"
-							>
-								+ Save Snippet
-							</button>
-						{/if}
-					</div>
-					<button
-						onclick={() => {
-							queryResult = null;
-							queryTrace = null;
-						}}
-						class="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase tracking-widest transition-colors"
-						>Clear</button
-					>
-				</div>
+			<button
+				onclick={triggerQuery}
+				disabled={!query.trim() || queryLoading}
+				class="bg-emerald-500 hover:bg-emerald-600 active:scale-95 px-8 py-3 rounded-xl text-white font-black tracking-widest uppercase transition-all flex justify-center items-center gap-2 text-xs shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:shadow-none"
+			>
+				⚡ Execute Segment
+			</button>
+		</div>
+	</div>
 
-				{#if !queryResult.success}
-					<div class="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-						<div
-							class="bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono break-all leading-relaxed whitespace-pre-wrap"
+	<!-- SQL RESULTS GRID -->
+	{#if queryResult}
+		<div
+			class="mt-4 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-4 overflow-hidden"
+		>
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-4">
+					<h3 class="text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
+						Execution Result
+					</h3>
+					{#if queryResult.execution_time_ms}
+						<span
+							class="text-[9px] font-black text-indigo-500 uppercase tracking-widest px-2 py-0.5 bg-indigo-500/10 rounded-lg border border-indigo-500/20 shadow-sm animate-in fade-in duration-500"
 						>
-							{queryResult.error}
+							Latency: {queryResult.execution_time_ms}ms
+						</span>
+					{/if}
+					{#if queryResult.success}
+						<button
+							onclick={() => (showSnippetModal = true)}
+							class="text-[9px] font-black text-emerald-500 hover:text-emerald-400 uppercase tracking-widest px-2 py-0.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20 transition-all active:scale-95"
+						>
+							+ Save Snippet
+						</button>
+					{/if}
+				</div>
+				<button
+					onclick={() => {
+						queryResult = null;
+						queryTrace = null;
+					}}
+					class="text-[10px] text-slate-400 hover:text-rose-500 font-bold uppercase tracking-widest transition-colors"
+					>Clear</button
+				>
+			</div>
+
+			{#if !queryResult.success}
+				<div class="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+					<div
+						class="bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono break-all leading-relaxed whitespace-pre-wrap"
+					>
+						{queryResult.error}
+					</div>
+
+					{#if getErrorHint(queryResult.error)}
+						<div
+							class="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3"
+						>
+							<span class="text-lg">💡</span>
+							<p
+								class="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest leading-relaxed"
+							>
+								{getErrorHint(queryResult.error)}
+							</p>
 						</div>
-						
-						{#if getErrorHint(queryResult.error)}
-							<div class="px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3">
-								<span class="text-lg">💡</span>
-								<p class="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest leading-relaxed">
-									{getErrorHint(queryResult.error)}
+					{/if}
+				</div>
+			{:else}
+				<!-- New Trace Summary Section -->
+				{#if queryTrace}
+					<div
+						class="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300"
+					>
+						<div class="flex items-center justify-between mb-3 border-b border-indigo-500/10 pb-2">
+							<div class="flex items-center gap-2">
+								<span
+									class="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] italic"
+									>⚡ Query Trace Summary</span
+								>
+								<a
+									href="/relations?query={encodeURIComponent(query)}"
+									class="text-[9px] font-black px-2 py-0.5 bg-indigo-500/10 text-indigo-500 rounded border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all uppercase tracking-widest"
+									>Jump to Graph</a
+								>
+							</div>
+							<span
+								class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border
+									{queryTrace.severity === 'HIGH'
+									? 'bg-rose-500 text-white border-rose-600 animate-pulse'
+									: queryTrace.severity === 'MEDIUM'
+										? 'bg-orange-500 text-white border-orange-600'
+										: 'bg-emerald-500 text-white border-emerald-600'}"
+							>
+								{queryTrace.severity} RisK
+							</span>
+						</div>
+
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="space-y-3">
+								<div>
+									<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+										Impacted Containers
+									</div>
+									<div class="flex flex-wrap gap-1">
+										{#each queryTrace.containers as c}
+											<span
+												class="text-[9px] px-2 py-0.5 bg-sky-500/10 text-sky-500 rounded border border-sky-500/20 font-bold uppercase"
+												>{c}</span
+											>
+										{:else}
+											<span class="text-[9px] font-bold text-slate-400 italic"
+												>No container fallout detected</span
+											>
+										{/each}
+									</div>
+								</div>
+								<div>
+									<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+										Downstream Tables
+									</div>
+									<div class="flex flex-wrap gap-1">
+										{#each queryTrace.dependent_tables as t}
+											<span
+												class="text-[9px] px-2 py-0.5 bg-rose-500/10 text-rose-500 rounded border border-rose-500/20 font-bold uppercase"
+												>{t.split('.').pop()}</span
+											>
+										{:else}
+											<span class="text-[9px] font-bold text-slate-400 italic"
+												>No structural dependents</span
+											>
+										{/each}
+									</div>
+								</div>
+							</div>
+							<div
+								class="bg-indigo-500/10 rounded-xl p-3 border border-indigo-500/10 flex flex-col justify-center"
+							>
+								<p
+									class="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 italic leading-relaxed"
+								>
+									{queryTrace.summary}
+								</p>
+								<p
+									class="text-[9px] text-indigo-500 font-bold mt-2 uppercase tracking-widest opacity-60"
+								>
+									Result set contains {queryResult.data?.length || 0} rows
 								</p>
 							</div>
-						{/if}
+						</div>
 					</div>
-				{:else}
-					<!-- New Trace Summary Section -->
-					{#if queryTrace}
-						<div
-							class="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300"
-						>
-							<div
-								class="flex items-center justify-between mb-3 border-b border-indigo-500/10 pb-2"
-							>
-								<div class="flex items-center gap-2">
-									<span
-										class="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] italic"
-										>⚡ Query Trace Summary</span
-									>
-									<a
-										href="/relations?query={encodeURIComponent(query)}"
-										class="text-[9px] font-black px-2 py-0.5 bg-indigo-500/10 text-indigo-500 rounded border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all uppercase tracking-widest"
-										>Jump to Graph</a
-									>
-								</div>
-								<span
-									class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border
-									{queryTrace.severity === 'HIGH'
-										? 'bg-rose-500 text-white border-rose-600 animate-pulse'
-										: queryTrace.severity === 'MEDIUM'
-											? 'bg-orange-500 text-white border-orange-600'
-											: 'bg-emerald-500 text-white border-emerald-600'}"
-								>
-									{queryTrace.severity} RisK
-								</span>
-							</div>
+				{/if}
 
-							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-								<div class="space-y-3">
-									<div>
-										<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-											Impacted Containers
-										</div>
-										<div class="flex flex-wrap gap-1">
-											{#each queryTrace.containers as c}
-												<span
-													class="text-[9px] px-2 py-0.5 bg-sky-500/10 text-sky-500 rounded border border-sky-500/20 font-bold uppercase"
-													>{c}</span
-												>
-											{:else}
-												<span class="text-[9px] font-bold text-slate-400 italic"
-													>No container fallout detected</span
-												>
-											{/each}
-										</div>
-									</div>
-									<div>
-										<div class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-											Downstream Tables
-										</div>
-										<div class="flex flex-wrap gap-1">
-											{#each queryTrace.dependent_tables as t}
-												<span
-													class="text-[9px] px-2 py-0.5 bg-rose-500/10 text-rose-500 rounded border border-rose-500/20 font-bold uppercase"
-													>{t.split('.').pop()}</span
-												>
-											{:else}
-												<span class="text-[9px] font-bold text-slate-400 italic"
-													>No structural dependents</span
-												>
-											{/each}
-										</div>
-									</div>
-								</div>
+				{#if queryResult.optimization_hints && queryResult.optimization_hints.length > 0}
+					<div
+						class="mt-4 p-6 bg-slate-950 border border-slate-800 rounded-[2.5rem] shadow-2xl animate-in slide-in-from-top-4 duration-700"
+					>
+						<div class="flex items-center gap-3 mb-6">
+							<div
+								class="w-10 h-10 bg-amber-500/10 rounded-2xl flex items-center justify-center text-xl border border-amber-500/20"
+							>
+								💡
+							</div>
+							<div>
+								<h4
+									class="text-[11px] font-black text-amber-500 uppercase tracking-[0.2em] italic leading-none"
+								>
+									Optimization Insights
+								</h4>
+								<p
+									class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1 italic leading-none"
+								>
+									Architectural suggestions for performance tuning
+								</p>
+							</div>
+						</div>
+						<div class="grid grid-cols-1 gap-4">
+							{#each queryResult.optimization_hints as hint}
 								<div
-									class="bg-indigo-500/10 rounded-xl p-3 border border-indigo-500/10 flex flex-col justify-center"
+									class="p-5 bg-white/5 dark:bg-slate-900/50 border border-slate-800 rounded-3xl flex flex-col gap-4 group transition-all hover:border-amber-500/30"
 								>
-									<p
-										class="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 italic leading-relaxed"
-									>
-										{queryTrace.summary}
-									</p>
-									<p
-										class="text-[9px] text-indigo-500 font-bold mt-2 uppercase tracking-widest opacity-60"
-									>
-										Result set contains {queryResult.data?.length || 0} rows
-									</p>
-								</div>
-							</div>
-						</div>
-					{/if}
-
-
-					{#if queryResult.optimization_hints && queryResult.optimization_hints.length > 0}
-						<div class="mt-4 p-6 bg-slate-950 border border-slate-800 rounded-[2.5rem] shadow-2xl animate-in slide-in-from-top-4 duration-700">
-							<div class="flex items-center gap-3 mb-6">
-								<div class="w-10 h-10 bg-amber-500/10 rounded-2xl flex items-center justify-center text-xl border border-amber-500/20">💡</div>
-								<div>
-									<h4 class="text-[11px] font-black text-amber-500 uppercase tracking-[0.2em] italic leading-none">Optimization Insights</h4>
-									<p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1 italic leading-none">Architectural suggestions for performance tuning</p>
-								</div>
-							</div>
-							<div class="grid grid-cols-1 gap-4">
-								{#each queryResult.optimization_hints as hint}
-									<div class="p-5 bg-white/5 dark:bg-slate-900/50 border border-slate-800 rounded-3xl flex flex-col gap-4 group transition-all hover:border-amber-500/30">
-										<div class="flex items-start gap-4">
-											<div class="w-2 h-2 rounded-full mt-1.5 bg-amber-500 shadow-lg shadow-amber-500/40"></div>
-											<p class="text-[11px] font-bold text-slate-300 leading-relaxed italic">{hint}</p>
-										</div>
-										{#if hint.includes('CREATE INDEX') || hint.includes('ANALYZE')}
-											<div class="flex items-center gap-2 mt-2 pt-4 border-t border-slate-800">
-												<button 
-													onclick={() => {
-														const sql = hint.split(': ').pop();
-														navigator.clipboard.writeText(sql);
-													}}
-													class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
-												>
-													Copy SQL
-												</button>
-												<button 
-													onclick={() => {
-														const sql = hint.split(': ').pop();
-														query = sql;
-													}}
-													class="px-4 py-2 bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white border border-amber-500/20 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
-												>
-													Send to Editor
-												</button>
-											</div>
-										{/if}
+									<div class="flex items-start gap-4">
+										<div
+											class="w-2 h-2 rounded-full mt-1.5 bg-amber-500 shadow-lg shadow-amber-500/40"
+										></div>
+										<p class="text-[11px] font-bold text-slate-300 leading-relaxed italic">
+											{hint}
+										</p>
 									</div>
-								{/each}
-							</div>
+									{#if hint.includes('CREATE INDEX') || hint.includes('ANALYZE')}
+										<div class="flex items-center gap-2 mt-2 pt-4 border-t border-slate-800">
+											<button
+												onclick={() => {
+													const sql = hint.split(': ').pop();
+													navigator.clipboard.writeText(sql);
+												}}
+												class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+											>
+												Copy SQL
+											</button>
+											<button
+												onclick={() => {
+													const sql = hint.split(': ').pop();
+													query = sql;
+												}}
+												class="px-4 py-2 bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white border border-amber-500/20 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
+											>
+												Send to Editor
+											</button>
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				{#if queryResult.columns && queryResult.data}
+					{#if queryResult.is_truncated}
+						<div
+							class="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3"
+						>
+							<span class="text-lg">🛑</span>
+							<span>Result Set Truncated at 1,000 Rows for Performance Safety.</span>
 						</div>
 					{/if}
 
-					{#if queryResult.columns && queryResult.data}
-						{#if queryResult.is_truncated}
-							<div
-								class="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3"
-							>
-								<span class="text-lg">🛑</span>
-								<span>Result Set Truncated at 1,000 Rows for Performance Safety.</span>
-							</div>
-						{/if}
-
-						<div
-							class="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto custom-scrollbar shadow-inner"
-						>
-							<table class="w-full text-left border-collapse min-w-max">
-								<thead>
-									<tr>
+					<div
+						class="bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto custom-scrollbar shadow-inner"
+					>
+						<table class="w-full text-left border-collapse min-w-max">
+							<thead>
+								<tr>
+									{#each queryResult.columns as col}
+										<th
+											class="p-4 text-[10px] bg-white dark:bg-slate-900 font-black text-slate-500 uppercase tracking-widest border-b border-r border-slate-200 dark:border-slate-800 whitespace-nowrap"
+											>{col}</th
+										>
+									{/each}
+								</tr>
+							</thead>
+							<tbody>
+								{#each queryResult.data as row}
+									<tr
+										class="hover:bg-blue-50/50 dark:hover:bg-slate-900/50 transition-colors group"
+									>
 										{#each queryResult.columns as col}
-											<th
-												class="p-4 text-[10px] bg-white dark:bg-slate-900 font-black text-slate-500 uppercase tracking-widest border-b border-r border-slate-200 dark:border-slate-800 whitespace-nowrap"
-												>{col}</th
+											<td
+												class="p-4 text-xs font-mono font-bold text-slate-600 dark:text-slate-300 border-b border-r border-slate-200 dark:border-slate-800 group-hover:border-blue-100 dark:group-hover:border-slate-700 whitespace-nowrap"
+												>{row[col] === null ? 'NULL' : String(row[col])}</td
 											>
 										{/each}
 									</tr>
-								</thead>
-								<tbody>
-									{#each queryResult.data as row}
-										<tr
-											class="hover:bg-blue-50/50 dark:hover:bg-slate-900/50 transition-colors group"
+								{/each}
+								{#if queryResult.data.length === 0}
+									<tr>
+										<td
+											colspan={queryResult.columns.length}
+											class="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest"
+											>0 Rows Returned</td
 										>
-											{#each queryResult.columns as col}
-												<td
-													class="p-4 text-xs font-mono font-bold text-slate-600 dark:text-slate-300 border-b border-r border-slate-200 dark:border-slate-800 group-hover:border-blue-100 dark:group-hover:border-slate-700 whitespace-nowrap"
-													>{row[col] === null ? 'NULL' : String(row[col])}</td
-												>
-											{/each}
-										</tr>
-									{/each}
-									{#if queryResult.data.length === 0}
-										<tr>
-											<td
-												colspan={queryResult.columns.length}
-												class="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest"
-												>0 Rows Returned</td
-											>
-										</tr>
-									{/if}
-								</tbody>
-							</table>
-						</div>
-					{:else}
-						<div
-							class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono"
-						>
-							⚡ {queryResult.affected_rows}
-						</div>
-					{/if}
+									</tr>
+								{/if}
+							</tbody>
+						</table>
+					</div>
+				{:else}
+					<div
+						class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 p-4 rounded-xl text-sm font-bold uppercase tracking-widest font-mono"
+					>
+						⚡ {queryResult.affected_rows}
+					</div>
 				{/if}
-			</div>
-		{/if}
-	</div>
-
-	{#if loading}
-		<div
-			class="flex items-center gap-4 text-emerald-600 dark:text-emerald-400 font-black animate-pulse uppercase tracking-wider text-sm ml-14"
-		>
-			<div
-				class="w-6 h-6 border-4 border-current border-t-transparent rounded-full animate-spin"
-			></div>
-			Exploring Schema...
+			{/if}
 		</div>
-	{:else}
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-			{#each tables as t}
-				{@const schema = t.includes('.') ? t.split('.')[0] : 'public'}
-				{@const tableName = t.includes('.') ? t.split('.')[1] : t}
-				{@const isPublic = schema === 'public'}
-				{@const sqlRef = isPublic ? tableName : t}
-				<a
-					href={`/table/${t}`}
-					class="bg-white dark:bg-slate-900 rounded-[2rem] p-8 border border-slate-200/60 dark:border-slate-800 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-500 group flex flex-col gap-6"
-				>
-					<div class="flex justify-between items-start">
-						<div
-							class="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center text-xl shadow-inner border border-emerald-100 dark:border-emerald-900/30"
+	{/if}
+
+{#if loading}
+	<div
+		class="flex items-center gap-4 text-emerald-600 dark:text-emerald-400 font-black animate-pulse uppercase tracking-wider text-sm ml-14"
+	>
+		<div
+			class="w-6 h-6 border-4 border-current border-t-transparent rounded-full animate-spin"
+		></div>
+		Exploring Schema...
+	</div>
+{:else}
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+		{#each tables as t}
+			{@const schema = t.includes('.') ? t.split('.')[0] : 'public'}
+			{@const tableName = t.includes('.') ? t.split('.')[1] : t}
+			{@const isPublic = schema === 'public'}
+			{@const sqlRef = isPublic ? tableName : t}
+			<a
+				href={`/table/${t}`}
+				class="bg-white dark:bg-slate-900 rounded-[2rem] p-8 border border-slate-200/60 dark:border-slate-800 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-500 group flex flex-col gap-6"
+			>
+				<div class="flex justify-between items-start">
+					<div
+						class="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center text-xl shadow-inner border border-emerald-100 dark:border-emerald-900/30"
+					>
+						<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+							/></svg
 						>
-							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+					</div>
+					<div class="flex items-center gap-2">
+						<span
+							class="text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest leading-none {isPublic
+								? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
+								: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'}"
+						>
+							{schema}
+						</span>
+						<div
+							class="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-300 dark:text-slate-700 group-hover:text-emerald-500 transition-colors"
+						>
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
 								><path
 									stroke-linecap="round"
 									stroke-linejoin="round"
-									stroke-width="2"
-									d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+									stroke-width="2.5"
+									d="M9 5l7 7-7 7"
 								/></svg
 							>
 						</div>
-						<div class="flex items-center gap-2">
-							<span
-								class="text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest leading-none {isPublic
-									? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
-									: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'}"
-							>
-								{schema}
-							</span>
-							<div
-								class="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-300 dark:text-slate-700 group-hover:text-emerald-500 transition-colors"
-							>
-								<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-									><path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2.5"
-										d="M9 5l7 7-7 7"
-									/></svg
-								>
-							</div>
-						</div>
 					</div>
-
-					<div>
-						<h3
-							class="text-2xl font-black text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors tracking-tight uppercase italic leading-none"
-						>
-							{tableName}
-						</h3>
-						<div class="flex items-center gap-2 mt-3">
-							<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 group-hover:animate-ping"></span>
-							<span
-								class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none"
-								>Table</span
-							>
-						</div>
-					</div>
-
-					<div
-						class="pt-4 border-t border-slate-50 dark:border-slate-800 mt-auto flex flex-col gap-1.5"
-					>
-						<span
-							class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none"
-							>SQL Ref</span
-						>
-						<code
-							class="text-[11px] font-mono font-bold {isPublic
-								? 'text-emerald-600 dark:text-emerald-400'
-								: 'text-amber-600 dark:text-amber-400'} leading-none">{sqlRef}</code
-						>
-					</div>
-				</a>
-			{:else}
-				<div
-					class="col-span-full py-20 flex flex-col items-center gap-6 text-slate-300 dark:text-slate-700"
-				>
-					<div
-						class="text-8xl opacity-10 italic font-black uppercase tracking-tighter leading-none"
-					>
-						Void
-					</div>
-					<p class="text-sm font-bold uppercase tracking-[0.3em]">No tables found</p>
 				</div>
-			{/each}
-		</div>
-	{/if}
+
+				<div>
+					<h3
+						class="text-2xl font-black text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors tracking-tight uppercase italic leading-none truncate"
+						title={tableName}
+					>
+						{tableName}
+					</h3>
+					<div class="flex items-center gap-2 mt-3">
+						<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 group-hover:animate-ping"></span>
+						<span
+							class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none"
+							>Table</span
+						>
+					</div>
+				</div>
+
+				<div
+					class="pt-4 border-t border-slate-50 dark:border-slate-800 mt-auto flex flex-col gap-1.5"
+				>
+					<span
+						class="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none"
+						>SQL Ref</span
+					>
+					<code
+						class="text-[11px] font-mono font-bold block truncate {isPublic
+							? 'text-emerald-600 dark:text-emerald-400'
+							: 'text-amber-600 dark:text-amber-400'} leading-none"
+						title={sqlRef}>{sqlRef}</code
+					>
+				</div>
+			</a>
+		{:else}
+			<div
+				class="col-span-full py-20 flex flex-col items-center gap-6 text-slate-300 dark:text-slate-700"
+			>
+				<div class="text-8xl opacity-10 italic font-black uppercase tracking-tighter leading-none">
+					Void
+				</div>
+				<p class="text-sm font-bold uppercase tracking-[0.3em]">No tables found</p>
+			</div>
+		{/each}
+	</div>
+{/if}
+</div>
 
 <!-- FIRST CONFIRMATION MODAL -->
 {#if showConfirmModal}
@@ -1177,8 +1209,7 @@
 											>
 											<button
 												onclick={() => (seedFile = null)}
-												class="text-emerald-500 hover:text-emerald-700 font-bold text-xs"
-												>×</button
+												class="text-emerald-500 hover:text-emerald-700 font-bold text-xs">×</button
 											>
 										</div>
 									{/if}
@@ -1278,67 +1309,82 @@
 	</div>
 {/if}
 
-	<!-- SAVE AS SNIPPET MODAL -->
-	{#if showSnippetModal}
+<!-- SAVE AS SNIPPET MODAL -->
+{#if showSnippetModal}
+	<div
+		class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md"
+	>
 		<div
-			class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md"
+			class="bg-white dark:bg-slate-950 border border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.1)] rounded-[2.5rem] p-10 max-w-md w-full flex flex-col gap-8 animate-in zoom-in-95 duration-200"
 		>
-			<div
-				class="bg-white dark:bg-slate-950 border border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.1)] rounded-[2.5rem] p-10 max-w-md w-full flex flex-col gap-8 animate-in zoom-in-95 duration-200"
-			>
-				<div class="flex flex-col gap-2">
-					<h3 class="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">
-						Store <span class="text-emerald-500">Snippet</span>
-					</h3>
-					<p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Identify this logic for future use</p>
-				</div>
+			<div class="flex flex-col gap-2">
+				<h3
+					class="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic"
+				>
+					Store <span class="text-emerald-500">Snippet</span>
+				</h3>
+				<p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+					Identify this logic for future use
+				</p>
+			</div>
 
-				<div class="flex flex-col gap-5">
-					<div class="space-y-2">
-						<label for="snip_name" class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Logic Label</label>
-						<input 
-							id="snip_name"
-							type="text" 
-							placeholder="e.g. Fetch Active Subscriptions" 
-							bind:value={snippetName}
-							class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none"
-						/>
-					</div>
-					<div class="space-y-2">
-						<label for="snip_tags" class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tags (Comma Separated)</label>
-						<input 
-							id="snip_tags"
-							type="text" 
-							placeholder="billing, safety, automation" 
-							bind:value={snippetTags}
-							class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none font-mono"
-						/>
-					</div>
-				</div>
-
-				<div class="bg-slate-950 rounded-2xl p-5 border border-slate-800">
-					<span class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Captured SQL</span>
-					<pre class="text-[10px] font-mono text-slate-400 whitespace-pre-wrap line-clamp-3 italic opacity-60">" {query} "</pre>
-				</div>
-
-				<div class="flex gap-4 pt-2">
-					<button 
-						onclick={() => showSnippetModal = false}
-						class="flex-1 px-6 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+			<div class="flex flex-col gap-5">
+				<div class="space-y-2">
+					<label
+						for="snip_name"
+						class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"
+						>Logic Label</label
 					>
-						Discard
-					</button>
-					<button 
-						onclick={saveSnippet}
-						disabled={!snippetName}
-						class="flex-1 px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+					<input
+						id="snip_name"
+						type="text"
+						placeholder="e.g. Fetch Active Subscriptions"
+						bind:value={snippetName}
+						class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none"
+					/>
+				</div>
+				<div class="space-y-2">
+					<label
+						for="snip_tags"
+						class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1"
+						>Tags (Comma Separated)</label
 					>
-						Register Snippet
-					</button>
+					<input
+						id="snip_tags"
+						type="text"
+						placeholder="billing, safety, automation"
+						bind:value={snippetTags}
+						class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none font-mono"
+					/>
 				</div>
 			</div>
+
+			<div class="bg-slate-950 rounded-2xl p-5 border border-slate-800">
+				<span class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2"
+					>Captured SQL</span
+				>
+				<pre
+					class="text-[10px] font-mono text-slate-400 whitespace-pre-wrap line-clamp-3 italic opacity-60">" {query} "</pre>
+			</div>
+
+			<div class="flex gap-4 pt-2">
+				<button
+					onclick={() => (showSnippetModal = false)}
+					class="flex-1 px-6 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+				>
+					Discard
+				</button>
+				<button
+					onclick={saveSnippet}
+					disabled={!snippetName}
+					class="flex-1 px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+				>
+					Register Snippet
+				</button>
+			</div>
 		</div>
-	{/if}
+	</div>
+{/if}
 
 <style>
 	.custom-scrollbar::-webkit-scrollbar {
