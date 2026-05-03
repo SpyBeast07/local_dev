@@ -196,6 +196,7 @@ def get_container_details(container_id: str):
 def get_dependency_graph():
     """Aggregate topological data from Docker and DB."""
     from services.db import load_config, get_relations
+    from services.ports import get_ports
     
     db_config = load_config()
     db_host = db_config.get("db_host", "localhost")
@@ -204,6 +205,18 @@ def get_dependency_graph():
     containers = get_containers()
     if "error" in containers:
         containers = []
+        
+    active_ports = get_ports()
+    if isinstance(active_ports, dict): # handle error
+        active_ports = []
+    
+    # Map PID to ports for faster lookup
+    pid_to_ports = {}
+    for p in active_ports:
+        pid = str(p["pid"])
+        if pid not in pid_to_ports:
+            pid_to_ports[pid] = []
+        pid_to_ports[pid].append(p)
         
     nodes_map = {}
     edges = []
@@ -243,6 +256,16 @@ def get_dependency_graph():
             "to": table, 
             "type": "contains"
         })
+
+    # 2.1 Connect Database to its Port node
+    db_port = str(db_config.get("db_port", "5432"))
+    db_port_id = f"port_{db_port}"
+    edges.append({
+        "from": db_node_id,
+        "to": db_port_id,
+        "type": "exposes",
+        "label": "LISTEN"
+    })
 
     # 3. Process Containers with Project-level Clustering
     projects_map = {}
@@ -313,6 +336,33 @@ def get_dependency_graph():
                             "label": "HOSTS DB"
                         })
         
+        # 3.1.2 OS-Level Port Matching via PID
+        c_pid = str(details.get("State", {}).get("Pid", "0"))
+        if c_pid in pid_to_ports:
+            for p in pid_to_ports[c_pid]:
+                port_num = p["port"]
+                port_id = f"port_{port_num}"
+                if port_id not in nodes_map:
+                    nodes_map[port_id] = {
+                        "id": port_id,
+                        "type": "port",
+                        "label": f"PORT {port_num}",
+                        "metadata": {
+                            "host_port": port_num,
+                            "container_port": port_num, # Same as host for OS-level
+                            "protocol": p["protocol"],
+                            "process": p["process"],
+                            "pid": p["pid"],
+                            "is_important": p["is_important"]
+                        }
+                    }
+                edges.append({
+                    "from": c_node_id,
+                    "to": port_id,
+                    "type": "exposes",
+                    "label": "PID MATCH"
+                })
+
         # 3.2 SQL Connectivity for this instance (ONLY IF RUNNING)
         if is_running:
             envs = details.get("Config", {}).get("Env", []),
@@ -357,6 +407,26 @@ def get_dependency_graph():
                 "type": "membership",
                 "label": ""
             })
+
+    # 5. Add Standalone Active Ports (that aren't already in the map)
+    for p in active_ports:
+        port_num = p["port"]
+        port_id = f"port_{port_num}"
+        if port_id not in nodes_map and p["is_important"]:
+            nodes_map[port_id] = {
+                "id": port_id,
+                "type": "port",
+                "label": f"PORT {port_num}",
+                "metadata": {
+                    "host_port": port_num,
+                    "container_port": port_num,
+                    "protocol": p["protocol"],
+                    "process": p["process"],
+                    "pid": p["pid"],
+                    "is_important": True,
+                    "standalone": True
+                }
+            }
             
     return {"nodes": list(nodes_map.values()), "edges": edges}
 

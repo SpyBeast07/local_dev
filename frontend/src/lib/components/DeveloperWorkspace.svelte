@@ -22,7 +22,7 @@
 	];
 </script>
 
-<div class="space-y-8 animate-in fade-in duration-1000">
+<div class="flex-1 flex flex-col gap-8 min-h-0 animate-in fade-in duration-1000 pb-10 pr-4">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
@@ -50,7 +50,7 @@
 	</div>
 
 	<!-- Main Tabbed Interface -->
-	<div class="flex flex-col h-[750px] bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden backdrop-blur-3xl animate-in zoom-in-95 duration-700">
+	<div class="flex-1 flex flex-col min-h-0 bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden backdrop-blur-3xl animate-in zoom-in-95 duration-700">
 		<!-- Tab Switcher -->
 		<div class="flex items-center p-4 gap-2 bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar">
 			{#each tabs as tab}
