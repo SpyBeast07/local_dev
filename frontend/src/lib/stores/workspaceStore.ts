@@ -33,11 +33,28 @@ export interface Snippet {
     last_used: string;
 }
 
+export interface Role {
+    name: string;
+    is_superuser: boolean;
+    can_login: boolean;
+    can_create_db: boolean;
+}
+
+export interface Privilege {
+    grantee: string;
+    schema: string;
+    table: string;
+    type: string;
+}
+
 interface WorkspaceState {
     history: HistoryEntry[];
     snippets: Snippet[];
     snapshots: any[];
     insights: AggregatedInsights | null;
+    roles: Role[];
+    privileges: Privilege[];
+    activeQueries: any[];
     isLoading: boolean;
     error: string | null;
 }
@@ -48,6 +65,9 @@ function createWorkspaceStore() {
         snippets: [],
         snapshots: [],
         insights: null,
+        roles: [],
+        privileges: [],
+        activeQueries: [],
         isLoading: false,
         error: null
     });
@@ -57,11 +77,13 @@ function createWorkspaceStore() {
         async fetchAll() {
             update(s => ({ ...s, isLoading: true }));
             try {
-                const [hist, snip, snaps, insights] = await Promise.all([
+                const [hist, snip, snaps, insights, roles, privs] = await Promise.all([
                     axios.get(`${API_BASE}/db/history`),
                     axios.get(`${API_BASE}/db/snippets`),
                     axios.get(`${API_BASE}/db/schema/snapshots`),
-                    axios.get(`${API_BASE}/db/insights`)
+                    axios.get(`${API_BASE}/db/insights`),
+                    axios.get(`${API_BASE}/db/roles`),
+                    axios.get(`${API_BASE}/db/privileges`)
                 ]);
 
                 set({
@@ -69,11 +91,22 @@ function createWorkspaceStore() {
                     snippets: snip.data.snippets || [],
                     snapshots: snaps.data.snapshots || [],
                     insights: insights.data.insights || null,
+                    roles: roles.data.roles || [],
+                    privileges: privs.data.privileges || [],
+                    activeQueries: [],
                     isLoading: false,
                     error: null
                 });
             } catch (err: any) {
                 update(s => ({ ...s, isLoading: false, error: err.message }));
+            }
+        },
+        async fetchActiveQueries() {
+            try {
+                const res = await axios.get(`${API_BASE}/db/queries/active`);
+                update(s => ({ ...s, activeQueries: res.data.queries || [] }));
+            } catch (err: any) {
+                console.error('Failed to fetch active queries', err);
             }
         },
         async fetchInsights() {
@@ -126,5 +159,6 @@ function createWorkspaceStore() {
         }
     };
 }
+
 
 export const workspaceStore = createWorkspaceStore();

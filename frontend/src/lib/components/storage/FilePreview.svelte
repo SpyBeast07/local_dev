@@ -7,10 +7,11 @@
 
 	let { open = false, onClose, file, sourceId, bucketName } = $props();
 
-	let content = $state(null);
+	let content = $state<string | null>(null);
 	let loading = $state(false);
 	let downloading = $state(false);
-	let error = $state(null);
+	let error = $state<string | null>(null);
+
 
 	$effect(() => {
 		if (open && file) {
@@ -58,9 +59,9 @@
 			if (!res.ok) throw new Error("Download failed");
 			const blob = await res.blob();
 
-			if (window.showSaveFilePicker) {
+			if ((window as any).showSaveFilePicker) {
 				try {
-					const fileHandle = await window.showSaveFilePicker({
+					const fileHandle = await (window as any).showSaveFilePicker({
 						suggestedName: file.name,
 					});
 					const writable = await fileHandle.createWritable();

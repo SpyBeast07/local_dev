@@ -17,12 +17,21 @@
 		db_name: ""
 	});
 
+	interface Source {
+		id: string;
+		name: string;
+		endpoint: string;
+		access_key: string;
+		secret_key: string;
+		region: string;
+	}
+
 	let loading = $state(true);
 	let saving = $state(false);
-	let notification = $state({ show: false, message: "", type: "success" });
+	let notification = $state<{ show: boolean, message: string, type: "success" | "danger" | "warning" | "info" | "neutral" | "premium" }>({ show: false, message: "", type: "success" });
 
 	// Storage State
-	let sources = $state([]);
+	let sources = $state<Source[]>([]);
 	let detecting = $state(false);
 	let newSource = $state({
 		name: "",
@@ -33,6 +42,7 @@
 	});
 
 	let deleteSourceModal = $state({ open: false, id: "", name: "" });
+
 
 	onMount(async () => {
 		try {
@@ -106,12 +116,13 @@
 		}
 	}
 
-	function showNotification(message: string, type: string) {
-		notification = { show: true, message, type };
+	function showNotification(message: string, type: "success" | "error") {
+		notification = { show: true, message, type: type === "error" ? "danger" : "success" };
 		setTimeout(() => {
 			notification.show = false;
 		}, 6000);
 	}
+
 </script>
 
 <div class="flex flex-col gap-10 pb-20">

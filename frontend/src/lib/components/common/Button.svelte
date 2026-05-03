@@ -6,15 +6,19 @@
 		size = "md",
 		loading = false,
 		disabled = false,
-		type = "button"
+		type = "button",
+		class: className = "",
+		...rest
 	}: { 
 		children: any,
-		onclick?: () => void,
+		onclick?: (e: MouseEvent) => void,
 		variant?: "primary" | "secondary" | "danger" | "ghost" | "cyan" | "indigo",
 		size?: "sm" | "md" | "lg",
 		loading?: boolean,
 		disabled?: boolean,
-		type?: "button" | "submit"
+		type?: "button" | "submit",
+		class?: string,
+		[key: string]: any
 	} = $props();
 
 	const variants = {
@@ -36,11 +40,13 @@
 <button 
 	{type}
 	{onclick}
+	{...rest}
 	disabled={disabled || loading}
-	class="rounded-xl font-black italic uppercase tracking-widest transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:hover:translate-y-0 disabled:active:scale-100 flex items-center justify-center gap-2 shadow-lg {variants[variant]} {sizes[size]}"
+	class="rounded-xl font-black italic uppercase tracking-widest transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:hover:translate-y-0 disabled:active:scale-100 flex items-center justify-center gap-2 shadow-lg {variants[variant]} {sizes[size]} {className}"
 >
 	{#if loading}
 		<div class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
 	{/if}
 	{@render children()}
 </button>
+

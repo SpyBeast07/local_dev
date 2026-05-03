@@ -8,22 +8,34 @@
 	import Card from '$lib/components/common/Card.svelte';
 	import Modal from '$lib/components/common/Modal.svelte';
 
+	interface Bucket {
+		name: string;
+	}
+
+	interface StorageObject {
+		name: string;
+		type: string;
+		size: number;
+		last_modified: string;
+	}
+
 	const sourceId = page.params.id;
-	let buckets = $state([]);
-	let selectedBucket = $state(null);
-	let objects = $state([]);
+	let buckets = $state<Bucket[]>([]);
+	let selectedBucket = $state<string | null>(null);
+	let objects = $state<StorageObject[]>([]);
 	let loadingBuckets = $state(true);
 	let loadingObjects = $state(false);
-	let error = $state(null);
+	let error = $state<string | null>(null);
 	let newBucketName = $state("");
 
 	// Preview State
 	let showPreview = $state(false);
-	let selectedFile = $state(null);
+	let selectedFile = $state<StorageObject | null>(null);
 
 	// Multi-select/Actions
 	let searchQuery = $state("");
-	let downloadingFile = $state(null);
+	let downloadingFile = $state<string | null>(null);
+
 
 	// Modal State
 	let deleteBucketModal = $state({ open: false, name: "" });
@@ -117,6 +129,7 @@
 
 	async function deleteObject(name: string) {
 		try {
+			if (!selectedBucket) return;
 			// Using encodeURIComponent but carefully for the object key
 			const res = await fetch(`http://localhost:8000/storage/${sourceId}/buckets/${encodeURIComponent(selectedBucket)}/objects/${encodeURIComponent(name)}`, {
 				method: 'DELETE'
@@ -149,9 +162,9 @@
 			const blob = await res.blob();
 
 			// Force OS Save As dialog
-			if (window.showSaveFilePicker) {
+			if ((window as any).showSaveFilePicker) {
 				try {
-					const fileHandle = await window.showSaveFilePicker({
+					const fileHandle = await (window as any).showSaveFilePicker({
 						suggestedName: fileName,
 					});
 					const writable = await fileHandle.createWritable();
@@ -357,7 +370,7 @@
 												<Button onclick={() => openPreview(obj)} variant="ghost" size="sm" class="p-2.5 min-w-0 border border-slate-200 dark:border-slate-800" title="Quick Preview">👁️</Button>
 												
 												<Button 
-													onclick={() => downloadFileWithPicker(selectedBucket, obj.name)} 
+													onclick={() => selectedBucket && downloadFileWithPicker(selectedBucket, obj.name)} 
 													variant="secondary" 
 													size="sm" 
 													class="p-2.5 min-w-10 border border-slate-200 dark:border-slate-800"

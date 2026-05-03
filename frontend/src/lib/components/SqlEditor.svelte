@@ -11,6 +11,7 @@
 	import { indentWithTab } from '@codemirror/commands';
 	import { schemaStore } from '$lib/stores/schemaStore';
 	import { parseQueryContext } from '$lib/utils/SqlParser';
+	import { json as jsonLang } from '@codemirror/lang-json';
 
 	let {
 		value = $bindable(''),

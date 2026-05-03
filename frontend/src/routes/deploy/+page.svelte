@@ -68,8 +68,9 @@
 			
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 				<div class="flex flex-col gap-2">
-					<label class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Image Name (required)</label>
+					<label for="image-name" class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Image Name (required)</label>
 					<input 
+						id="image-name"
 						type="text" 
 						bind:value={form.image} 
 						placeholder="e.g. nginx:latest" 
@@ -77,8 +78,9 @@
 					/>
 				</div>
 				<div class="flex flex-col gap-2">
-					<label class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Container Name (optional)</label>
+					<label for="container-name" class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Container Name (optional)</label>
 					<input 
+						id="container-name"
 						type="text" 
 						bind:value={form.name} 
 						placeholder="e.g. web-server" 
@@ -104,7 +106,7 @@
 							placeholder="e.g. 8080:80" 
 							class="flex-1 bg-slate-50 dark:bg-slate-950 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 text-sm font-bold tracking-wider placeholder:text-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
 						/>
-						<button onclick={() => removePort(i)} class="w-12 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all">
+						<button onclick={() => removePort(i)} aria-label="Remove port binding" class="w-12 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all">
 							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
 						</button>
 					</div>
@@ -128,7 +130,7 @@
 							placeholder="e.g. POSTGRES_PASSWORD=secret" 
 							class="flex-1 bg-slate-50 dark:bg-slate-950 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 text-sm font-bold tracking-wider placeholder:text-slate-500 focus:outline-none focus:border-rose-500 transition-colors font-mono"
 						/>
-						<button onclick={() => removeEnv(i)} class="w-12 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all">
+						<button onclick={() => removeEnv(i)} aria-label="Remove environment variable" class="w-12 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all">
 							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
 						</button>
 					</div>

@@ -6,9 +6,18 @@
 	import Badge from '$lib/components/common/Badge.svelte';
 	import InputField from '$lib/components/common/InputField.svelte';
 
-	let sources = $state([]);
+	interface Source {
+		id: string;
+		name: string;
+		endpoint: string;
+		access_key: string;
+		secret_key: string;
+		region: string;
+	}
+
+	let sources = $state<Source[]>([]);
 	let loading = $state(true);
-	let error = $state(null);
+	let error = $state<string | null>(null);
 
 	// New Source Form
 	let showAddModal = $state(false);
@@ -19,6 +28,7 @@
 		secret_key: 'minioadmin',
 		region: 'us-east-1'
 	});
+
 
 	async function fetchSources() {
 		loading = true;
