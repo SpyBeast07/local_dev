@@ -87,7 +87,7 @@
 	onMount(fetchSources);
 </script>
 
-<div class="space-y-12" in:fade>
+<div class="flex-1 flex flex-col gap-12 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar pr-4 pb-10" in:fade>
 	<div class="flex items-end justify-between">
 		<header class="flex flex-col gap-3">
 			<div class="flex items-center gap-4">

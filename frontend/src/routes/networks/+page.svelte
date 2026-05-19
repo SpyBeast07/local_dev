@@ -24,7 +24,7 @@
 	});
 </script>
 
-<div class="flex flex-col gap-10 ">
+<div class="flex-1 flex flex-col gap-10 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar pr-4 pb-10">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-center gap-4">
 			<h1 class="text-5xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase leading-none">Networks<span class="text-cyan-500 uppercase italic">.</span></h1>
