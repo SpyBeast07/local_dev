@@ -129,6 +129,13 @@ source venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
+
+Or Execute directly (if venv is not working)
+
+```bash
+ ./venv/bin/uvicorn main:app --reload
+```
+
 *Note: Available at `http://127.0.0.1:8000`.*
 
 ### 2. Start the Frontend Application
