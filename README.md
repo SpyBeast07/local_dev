@@ -2,8 +2,6 @@
 
 **DevBeast is a local-first DevOps control plane that gives developers structural visibility and high-speed control over their entire development stack — containers, databases, and services — in a single pane of glass.**
 
-![DevBeast Dashboard Mockup](docs/images/dashboard_mockup.png)
-
 ## 😩 The Problem
 Modern development requires juggling multiple fragmented tools:
 - **Portainer/Docker Desktop** for containers
@@ -110,6 +108,12 @@ Before you `COMMIT`, DevBeast computes the structural fallout of your changes.
 - **Frontend**: SvelteKit (Svelte 5 Runes) + Tailwind CSS v4 + CodeMirror 6 + Vis-Network
 - **Backend**: Python + FastAPI + Psycopg2 + Pandas + PyDBML
 - **Execution Engine**: Local Docker Engine + Subprocess Wrapper
+
+---
+
+## Architecture Diagram
+
+![Architecture Diagram](images/archDiagram.png)
 
 ---
 
